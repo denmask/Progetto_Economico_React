@@ -1,57 +1,81 @@
 import React, { useContext } from 'react';
 import FinancialContext from '../context/FinancialContext';
-import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 const ContoEconomico = () => {
   const { state, dispatch } = useContext(FinancialContext);
-  const { ricavi, costi, ammortamenti } = state.contoEconomico;
+  const ce = state.contoEconomico;
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    dispatch({
-      type: 'UPDATE_CE',
-      payload: { [name]: parseFloat(value) || 0 }
+  const handleChange = (e) => {
+    dispatch({ 
+      type: 'UPDATE_CE', 
+      payload: { [e.target.name]: parseFloat(e.target.value) || 0 } 
     });
   };
 
-  const ebitda = ricavi - costi;
-  const ebit = ebitda - ammortamenti;
+  const totaleRicavi = (ce.ricaviVendita || 0) + (ce.canoniLocazione || 0) + (ce.interessiAttivi || 0) + (ce.rimanenzeFinali || 0) + (ce.plusvalenze || 0);
+  const totaleCosti = (ce.acquistiMerci || 0) + (ce.personale || 0) + (ce.serviziTecnici || 0);
+  const ebitda = totaleRicavi - totaleCosti;
+  const utile = ebitda - (ce.ammortamenti || 0) - (ce.oneriFinanziari || 0) - (ce.imposte || 0);
 
   return (
     <div className="container">
-      <h2 style={{ marginBottom: '2rem' }}>Gestione Conto Economico</h2>
-      
+      <div className="card" style={{ marginBottom: '2rem', borderBottom: '4px solid var(--primary)' }}>
+        <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <TrendingUp size={32} color="var(--primary)" /> Analisi Conto Economico
+        </h1>
+        <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Gestione ricavi e costi d'esercizio basata su riclassificazione bilancio.</p>
+      </div>
+
       <div className="grid">
-        <div className="card">
-          <h3>Inserimento Dati</h3>
+        <section className="card">
+          <h3 style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
+            <ArrowUpRight size={20}/> Entrate e Ricavi
+          </h3>
           <div className="input-group">
-            <label>Ricavi / Fatturato (€)</label>
-            <input type="number" name="ricavi" value={ricavi} onChange={handleInputChange} />
+            <label>Ricavi di Vendita</label>
+            <input type="number" name="ricaviVendita" value={ce.ricaviVendita} onChange={handleChange} step="100" />
+            
+            <label>Rimanenze Finali</label>
+            <input type="number" name="rimanenzeFinali" value={ce.rimanenzeFinali} onChange={handleChange} step="50" />
+            
+            <label>Canoni Locazione</label>
+            <input type="number" name="canoniLocazione" value={ce.canoniLocazione} onChange={handleChange} step="50" />
+            
+            <label>Plusvalenze / Altri</label>
+            <input type="number" name="plusvalenze" value={ce.plusvalenze} onChange={handleChange} step="10" />
           </div>
+        </section>
+
+        <section className="card">
+          <h3 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
+            <ArrowDownRight size={20}/> Costi Operativi
+          </h3>
           <div className="input-group">
-            <label>Costi Operativi (€)</label>
-            <input type="number" name="costi" value={costi} onChange={handleInputChange} />
+            <label>Acquisti Merci</label>
+            <input type="number" name="acquistiMerci" value={ce.acquistiMerci} onChange={handleChange} step="100" />
+            
+            <label>Costi Personale</label>
+            <input type="number" name="personale" value={ce.personale} onChange={handleChange} step="100" />
+            
+            <label>Servizi e Manutenzioni</label>
+            <input type="number" name="serviziTecnici" value={ce.serviziTecnici} onChange={handleChange} step="50" />
+            
+            <label>Ammortamenti</label>
+            <input type="number" name="ammortamenti" value={ce.ammortamenti} onChange={handleChange} step="10" />
           </div>
-          <div className="input-group">
-            <label>Ammortamenti (€)</label>
-            <input type="number" name="ammortamenti" value={ammortamenti} onChange={handleInputChange} />
-          </div>
+        </section>
+      </div>
+
+      <div className="grid" style={{ marginTop: '2rem' }}>
+        <div className="card" style={{ textAlign: 'center', background: 'rgba(16, 185, 129, 0.05)', borderColor: 'var(--success)' }}>
+          <span style={{ color: 'var(--success)', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.8rem' }}>Margine Operativo (EBITDA)</span>
+          <h2 style={{ fontSize: '2.5rem', margin: '0.5rem 0', color: '#fff' }}>{ebitda.toLocaleString()} €</h2>
         </div>
-
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
-          <div style={{ padding: '1.5rem', background: '#f0fdf4', borderRadius: '12px', borderLeft: '5px solid #22c55e' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#166534' }}>
-              <TrendingUp size={20} /> <strong>EBITDA</strong>
-            </div>
-            <h2 style={{ margin: '0.5rem 0', color: '#166534' }}>{ebitda.toLocaleString()} €</h2>
-          </div>
-
-          <div style={{ padding: '1.5rem', background: '#eff6ff', borderRadius: '12px', borderLeft: '5px solid #3b82f6' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e40af' }}>
-              <DollarSign size={20} /> <strong>EBIT (Risultato Operativo)</strong>
-            </div>
-            <h2 style={{ margin: '0.5rem 0', color: '#1e40af' }}>{ebit.toLocaleString()} €</h2>
-          </div>
+        
+        <div className="card" style={{ textAlign: 'center', background: 'rgba(99, 102, 241, 0.05)', borderColor: 'var(--primary)' }}>
+          <span style={{ color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.8rem' }}>Utile d'Esercizio</span>
+          <h2 style={{ fontSize: '2.5rem', margin: '0.5rem 0', color: '#fff' }}>{utile.toLocaleString()} €</h2>
         </div>
       </div>
     </div>
