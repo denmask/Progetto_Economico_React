@@ -1,0 +1,5 @@
+{
+  "contoEconomico": { "ricavi": 0, "costi": 0, "ammortamenti": 0 },
+  "statoPatrimoniale": { "attivo": 0, "passivo": 0, "patrimonio": 0 },
+  "preventivo": { "budget": 0, "consuntivo": 0 }
+}
