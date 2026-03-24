@@ -13,15 +13,13 @@ function App() {
     <FinancialProvider>
       <Router>
         <Navbar />
-        <div className="container">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/conto-economico" element={<ContoEconomico />} />
-            <Route path="/stato-patrimoniale" element={<StatoPatrimoniale />} />
-            <Route path="/preventivo" element={<Preventivo />} />
-            <Route path="/report" element={<Report />} />
-          </Routes>
-        </div>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/conto-economico" element={<ContoEconomico />} />
+          <Route path="/stato-patrimoniale" element={<StatoPatrimoniale />} />
+          <Route path="/preventivo" element={<Preventivo />} />
+          <Route path="/report" element={<Report />} />
+        </Routes>
       </Router>
     </FinancialProvider>
   );
