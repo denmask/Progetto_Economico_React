@@ -131,7 +131,7 @@ const financialReducer = (state, action) => {
 export const FinancialProvider = ({ children }) => {
   const [state, dispatch] = useReducer(financialReducer, defaultState, () => {
     try {
-      const saved = localStorage.getItem('findash_v2');
+      const saved = 'findash_v2';
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
