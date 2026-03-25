@@ -206,7 +206,6 @@ const Report = () => {
     })),
   };
 
-  // FUNZIONE ESPORTA PDF SISTEMATA
   const exportPDF = () => {
     const input = reportRef.current;
     html2canvas(input, {
