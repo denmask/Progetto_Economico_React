@@ -8,6 +8,8 @@ import {
   PointElement, Title, Tooltip, Legend, Filler
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -204,16 +206,28 @@ const Report = () => {
     })),
   };
 
-  const exportPDF = async () => {
-    const { default: jsPDF } = await import('jspdf');
-    const { default: html2canvas } = await import('html2canvas');
-    const canvas = await html2canvas(reportRef.current, { scale: 2, backgroundColor: '#080c14' });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const w = pdf.internal.pageSize.getWidth();
-    const h = (canvas.height * w) / canvas.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, w, h);
-    pdf.save('Report_Finanziario.pdf');
+  // FUNZIONE ESPORTA PDF SISTEMATA
+  const exportPDF = () => {
+    const input = reportRef.current;
+    html2canvas(input, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#080c14',
+      logging: false,
+    }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgFinalWidth = imgWidth * ratio;
+      const imgFinalHeight = imgHeight * ratio;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgFinalWidth, imgFinalHeight);
+      pdf.save(`Report_Finanziario_${state.annoSelezionato}.pdf`);
+    });
   };
 
   const tabStyle = (active) => ({
