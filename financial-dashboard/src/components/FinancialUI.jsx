@@ -18,14 +18,12 @@ function useMountClass(className) {
     const remove = () => el.classList.remove(className);
     el.addEventListener('animationend', remove, { once: true });
     return () => el.removeEventListener('animationend', remove);
-  }, []); 
+  }, []);
 
   return ref;
 }
 
-export const FieldGroup = ({
-  label, color = 'blue', icon, children, subtotal, defaultOpen = true,
-}) => {
+export const FieldGroup = ({ label, color = 'blue', icon, children, subtotal, defaultOpen = true }) => {
   const [open, setOpen] = useState(defaultOpen);
   const ref = useMountClass('animate-in');
 
@@ -39,9 +37,7 @@ export const FieldGroup = ({
           {subtotal !== undefined && (
             <span style={{
               fontFamily: 'var(--mono)', fontSize: '0.85rem', fontWeight: 700,
-              color: color === 'green' ? 'var(--success)'
-                   : color === 'red'   ? 'var(--danger)'
-                   : 'var(--primary)',
+              color: color === 'green' ? 'var(--success)' : color === 'red' ? 'var(--danger)' : 'var(--primary)',
             }}>
               {fmt(subtotal)}
             </span>
@@ -56,10 +52,11 @@ export const FieldGroup = ({
   );
 };
 
-export const Field = ({ label, name, value, onChange, hint }) => {
+export const Field = ({ label, name, value, onChange, hint, allowNegative = false }) => {
   const [display, setDisplay] = useState(
     value === 0 || value === '' || value == null ? '' : String(value)
   );
+
   useEffect(() => {
     const num = Number(value);
     setDisplay(num === 0 ? '' : String(num));
@@ -67,7 +64,8 @@ export const Field = ({ label, name, value, onChange, hint }) => {
 
   const emit = useCallback(
     (num) => {
-      const safe = isNaN(num) ? 0 : Math.max(0, Math.trunc(num));
+      const truncated = Math.trunc(num);
+      const safe = isNaN(truncated) ? 0 : truncated;
       onChange({ target: { name, value: String(safe) } });
       return safe;
     },
@@ -77,28 +75,31 @@ export const Field = ({ label, name, value, onChange, hint }) => {
   const handleChange = (e) => {
     const raw = e.target.value;
     setDisplay(raw);
+    if (raw === '' || raw === '-') {
+      emit(0);
+      return;
+    }
     const n = parseFloat(raw);
     if (!isNaN(n)) emit(n);
-    else if (raw === '' || raw === '-') emit(0);
   };
 
   const handleBlur = (e) => {
     const n = parseFloat(e.target.value);
-    const safe = isNaN(n) ? 0 : Math.max(0, Math.trunc(n));
+    const safe = isNaN(n) ? 0 : Math.trunc(n);
     setDisplay(safe === 0 ? '' : String(safe));
     emit(safe);
   };
 
-  const timerRef    = useRef(null);
+  const timerRef = useRef(null);
   const intervalRef = useRef(null);
   const displayRef = useRef(display);
   useEffect(() => { displayRef.current = display; }, [display]);
 
   const spin = useCallback(
     (dir) => {
-      const cur  = parseFloat(displayRef.current) || 0;
-      const next = Math.max(0, Math.trunc(cur) + dir);
-      const str  = next === 0 ? '' : String(next);
+      const cur = parseFloat(displayRef.current) || 0;
+      const next = Math.trunc(cur) + dir;
+      const str = next === 0 ? '' : String(next);
       setDisplay(str);
       displayRef.current = str;
       emit(next);
@@ -170,12 +171,8 @@ export const Field = ({ label, name, value, onChange, hint }) => {
 
 export const SubtotalRow = ({ label, value, isTotal = false, color }) => {
   const colorMap = {
-    green:   'var(--success)',
-    red:     'var(--danger)',
-    blue:    'var(--primary)',
-    cyan:    'var(--accent)',
-    purple:  'var(--purple)',
-    warning: 'var(--warning)',
+    green: 'var(--success)', red: 'var(--danger)', blue: 'var(--primary)',
+    cyan: 'var(--accent)', purple: 'var(--purple)', warning: 'var(--warning)',
   };
   const c = colorMap[color] || 'var(--text-bright)';
   return (

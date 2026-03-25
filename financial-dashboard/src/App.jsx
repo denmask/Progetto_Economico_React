@@ -5,6 +5,7 @@ import ContoEconomico from './pages/ContoEconomico';
 import StatoPatrimoniale from './pages/StatoPatrimoniale';
 import Preventivo from './pages/Preventivo';
 import Report from './pages/Report';
+import StoricoDati from './pages/StoricoDati';
 import Navbar from './components/Navbar';
 import './styles/global.css';
 
@@ -19,6 +20,7 @@ function App() {
           <Route path="/stato-patrimoniale" element={<StatoPatrimoniale />} />
           <Route path="/preventivo" element={<Preventivo />} />
           <Route path="/report" element={<Report />} />
+          <Route path="/storico/:anno" element={<StoricoDati />} />
         </Routes>
       </Router>
     </FinancialProvider>

@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import FinancialContext from '../context/FinancialContext';
 import { FieldGroup, Field, SubtotalRow, KpiCard } from '../components/FinancialUI';
+import AnnoSelector from '../components/AnnoSelector';
 import { Scale, Landmark, Wallet, TrendingUp, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
 const sum = (...args) => args.reduce((a, b) => a + (b || 0), 0);
@@ -12,55 +13,45 @@ const StatoPatrimoniale = () => {
   const sp = state.statoPatrimoniale;
 
   const handleChange = (e) => {
-    dispatch({ type: 'UPDATE_SP', payload: { [e.target.name]: parseFloat(e.target.value) || 0 } });
+    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+    dispatch({ type: 'UPDATE_SP', payload: { [e.target.name]: isNaN(val) ? 0 : val } });
   };
-  const f = (name) => ({ name, value: sp[name] || 0, onChange: handleChange });
 
-  // ── ATTIVO ──
-  const immobilizzatoMateriale = sum(
-    sp.fabbricati, sp.impianti, sp.attrezzature, sp.macchinari, sp.autoveicoli
-  );
+  const f = (name) => ({ name, value: sp[name] ?? 0, onChange: handleChange });
+
+  const immobilizzatoMateriale   = sum(sp.fabbricati, sp.impianti, sp.attrezzature, sp.macchinari, sp.autoveicoli);
   const immobilizzatoImmateriale = sum(sp.avviamento, sp.brevetti, sp.immImmateriali);
   const immobilizzatoFinanziario = sum(sp.partecipazioni, sp.creditiFinanzLungo, sp.immFinanziarie);
-  const totaleImmobilizzato = sum(immobilizzatoMateriale, immobilizzatoImmateriale, immobilizzatoFinanziario);
+  const totaleImmobilizzato      = sum(immobilizzatoMateriale, immobilizzatoImmateriale, immobilizzatoFinanziario);
 
-  const disponibilita = sum(sp.cassa, sp.bancaCC, sp.altreDisponibilita, sp.titoliQuotati);
-  const crediti = sum(sp.creditiClienti, sp.creditiAltri, sp.creditiTributo, sp.creditiPrevidenziali);
-  const rimanenze = sum(sp.rimanenzeMerci, sp.rimanenzeMP, sp.rimanenzeSemilavorati, sp.rimanenzeProdotti);
+  const disponibilita      = sum(sp.cassa, sp.bancaCC, sp.altreDisponibilita, sp.titoliQuotati);
+  const crediti            = sum(sp.creditiClienti, sp.creditiAltri, sp.creditiTributo, sp.creditiPrevidenziali);
+  const rimanenze          = sum(sp.rimanenzeMerci, sp.rimanenzeMP, sp.rimanenzeSemilavorati, sp.rimanenzeProdotti);
   const rateiRisconiAttivi = sum(sp.risconiAttivi, sp.rateiAttivi);
-  const totaleCircolante = sum(disponibilita, crediti, rimanenze, rateiRisconiAttivi);
+  const totaleCircolante   = sum(disponibilita, crediti, rimanenze, rateiRisconiAttivi);
+  const totaleAttivo       = sum(totaleImmobilizzato, totaleCircolante);
 
-  const totaleAttivo = sum(totaleImmobilizzato, totaleCircolante);
-
-  // ── PASSIVO ──
   const patrimonioNetto = sum(
     sp.capitaleSociale, sp.riservaLegale, sp.riserveStatutarie,
     sp.riserveStraodinarie, sp.utiliPrecedenti
   ) - (sp.perditePrecedenti || 0);
 
-  const debitiBreve = sum(
-    sp.debitiBanche, sp.debitiFornitori, sp.debitiTributari,
-    sp.debitiPrevidenziali, sp.debitiVsDipendenti, sp.altriDebitiBreve
-  );
+  const debitiBreve  = sum(sp.debitiBanche, sp.debitiFornitori, sp.debitiTributari, sp.debitiPrevidenziali, sp.debitiVsDipendenti, sp.altriDebitiBreve);
   const debitiLungoT = sum(sp.mutui, sp.debitiLeasing, sp.obbligazioni, sp.debitiLungo);
-  const fondi = sum(sp.fondoTFR, sp.fondoRischi, sp.fondoImposte, sp.fondoSvalutazione);
+  const fondi        = sum(sp.fondoTFR, sp.fondoRischi, sp.fondoImposte, sp.fondoSvalutazione);
   const rateiPassivi = sum(sp.rateiPassivi, sp.riscontiPassivi);
-
   const totalePassivo = sum(debitiBreve, debitiLungoT, fondi, rateiPassivi);
-  const totaleFonti = sum(patrimonioNetto, totalePassivo);
-  const differenza = totaleAttivo - totaleFonti;
-  const quadrato = Math.abs(differenza) < 1;
+  const totaleFonti  = sum(patrimonioNetto, totalePassivo);
+  const differenza   = totaleAttivo - totaleFonti;
+  const quadrato     = Math.abs(differenza) < 1;
 
-  // ── INDICI ──
-  const currentRatio = ratio(totaleCircolante, debitiBreve);
-  const quickRatio = ratio(sum(disponibilita, crediti), debitiBreve);
-  const debtEquity = patrimonioNetto > 0 ? ratio(totalePassivo, patrimonioNetto) : '—';
-  const solidita = pct(patrimonioNetto, totaleFonti);
-  const coperturaImm = patrimonioNetto > 0 ? pct(patrimonioNetto, totaleImmobilizzato) : '—';
+  const currentRatio  = ratio(totaleCircolante, debitiBreve);
+  const quickRatio    = ratio(sum(disponibilita, crediti), debitiBreve);
+  const debtEquity    = patrimonioNetto > 0 ? ratio(totalePassivo, patrimonioNetto) : '—';
+  const solidita      = pct(patrimonioNetto, totaleFonti);
 
   return (
     <div className="page-wrapper">
-      {/* Header */}
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
@@ -77,17 +68,15 @@ const StatoPatrimoniale = () => {
         </div>
       </div>
 
-      {/* KPI strip */}
+      <AnnoSelector />
+
       <div className="grid-4" style={{ marginBottom: '2rem' }}>
         <KpiCard label="Totale Attivo" value={totaleAttivo} color="blue" icon={<Landmark size={18}/>} />
-        <KpiCard label="Patrimonio Netto" value={patrimonioNetto} color={patrimonioNetto >= 0 ? 'green' : 'red'} icon={<TrendingUp size={18}/>}
-          sub={`Solidità: ${solidita}%`} />
-        <KpiCard label="Debiti Totali" value={totalePassivo} color="red" icon={<Wallet size={18}/>}
-          sub={`D/E: ${debtEquity}`} />
+        <KpiCard label="Patrimonio Netto" value={patrimonioNetto} color={patrimonioNetto >= 0 ? 'green' : 'red'} icon={<TrendingUp size={18}/>} sub={`Solidità: ${solidita}%`} />
+        <KpiCard label="Debiti Totali" value={totalePassivo} color="red" icon={<Wallet size={18}/>} sub={`D/E: ${debtEquity}`} />
         <KpiCard label="Totale Fonti" value={totaleFonti} color="cyan" />
       </div>
 
-      {/* Indici di bilancio */}
       <div className="card animate-in" style={{ marginBottom: '2rem' }}>
         <h3 style={{ color: 'var(--text-bright)', marginBottom: '1rem', fontSize: '0.85rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
           📊 Indici di Bilancio
@@ -118,7 +107,6 @@ const StatoPatrimoniale = () => {
 
       <div className="grid-2" style={{ alignItems: 'start', gap: '2rem' }}>
 
-        {/* ── ATTIVO ── */}
         <div>
           <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Landmark size={20} color="var(--accent)" />
@@ -128,7 +116,7 @@ const StatoPatrimoniale = () => {
           </div>
 
           <FieldGroup label="A — Crediti verso Soci" color="cyan" icon="📋" defaultOpen={false}>
-            <Field label="Crediti verso Soci per versamenti dovuti" name="creditiVsSoci" value={0} onChange={handleChange} hint="Quota non ancora versata" />
+            <Field label="Crediti verso Soci per versamenti dovuti" name="creditiVsSoci" value={sp.creditiVsSoci ?? 0} onChange={handleChange} hint="Quota non ancora versata" />
           </FieldGroup>
 
           <FieldGroup label="B.I — Immobilizzazioni Immateriali" color="cyan" icon="💡" defaultOpen={false} subtotal={immobilizzatoImmateriale}>
@@ -191,7 +179,6 @@ const StatoPatrimoniale = () => {
           </div>
         </div>
 
-        {/* ── PASSIVO ── */}
         <div>
           <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Wallet size={20} color="var(--danger)" />
@@ -245,7 +232,6 @@ const StatoPatrimoniale = () => {
           <SubtotalRow label="Totale Debiti + Fondi" value={totalePassivo} isTotal color="red" />
           <SubtotalRow label="TOTALE PASSIVO E NETTO" value={totaleFonti} isTotal color={quadrato ? 'green' : 'red'} />
 
-          {/* Quadratura */}
           <div className={`balance-status ${quadrato ? 'balanced' : 'unbalanced'}`} style={{ marginTop: '1.5rem' }}>
             {quadrato
               ? <><CheckCircle2 size={22}/> Bilancio in pareggio ✓</>
@@ -253,7 +239,6 @@ const StatoPatrimoniale = () => {
             }
           </div>
 
-          {/* Progress bars */}
           {totaleAttivo > 0 && (
             <div className="card" style={{ marginTop: '1.5rem' }}>
               <h4 style={{ color: 'var(--text-bright)', marginBottom: '1rem', fontSize: '0.8rem' }}>
@@ -261,9 +246,9 @@ const StatoPatrimoniale = () => {
               </h4>
               {[
                 { label: 'Patrimonio Netto', value: Math.max(0, patrimonioNetto), color: 'var(--success)' },
-                { label: 'Debiti Breve', value: debitiBreve, color: 'var(--danger)' },
-                { label: 'Debiti Lungo', value: debitiLungoT, color: 'var(--warning)' },
-                { label: 'Fondi', value: fondi, color: 'var(--purple)' },
+                { label: 'Debiti Breve',     value: debitiBreve,                  color: 'var(--danger)'  },
+                { label: 'Debiti Lungo',     value: debitiLungoT,                 color: 'var(--warning)' },
+                { label: 'Fondi',            value: fondi,                        color: 'var(--purple)'  },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ marginBottom: '0.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.75rem' }}>

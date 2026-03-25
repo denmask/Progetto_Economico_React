@@ -1,5 +1,6 @@
 import React, { useContext, useState } from 'react';
 import FinancialContext from '../context/FinancialContext';
+import AnnoSelector from '../components/AnnoSelector';
 import { Target, AlertCircle, CheckCircle2, TrendingUp, TrendingDown, Plus, Trash2 } from 'lucide-react';
 
 const fmt = (n) => (n || 0).toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
@@ -15,7 +16,6 @@ const defaultCategories = [
 
 const Preventivo = () => {
   const { state, dispatch } = useContext(FinancialContext);
-
   const [categorie, setCategorie] = useState(defaultCategories);
   const [newNome, setNewNome] = useState('');
 
@@ -54,7 +54,8 @@ const Preventivo = () => {
         <p style={{ marginTop: 6 }}>Confronto Budget vs Consuntivo con analisi degli scostamenti per categoria</p>
       </div>
 
-      {/* Globale */}
+      <AnnoSelector />
+
       <div className="grid-2" style={{ marginBottom: '2rem' }}>
         <div className="card animate-in">
           <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.25rem', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -78,14 +79,11 @@ const Preventivo = () => {
             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>
               Analisi Scostamento
             </span>
-            {isPositive
-              ? <CheckCircle2 size={22} color="var(--success)" />
-              : <AlertCircle size={22} color="var(--danger)" />}
+            {isPositive ? <CheckCircle2 size={22} color="var(--success)" /> : <AlertCircle size={22} color="var(--danger)" />}
           </div>
           <div style={{
             fontSize: '2.5rem', fontFamily: 'var(--mono)', fontWeight: 800,
-            color: isPositive ? 'var(--success)' : 'var(--danger)',
-            marginBottom: '0.5rem',
+            color: isPositive ? 'var(--success)' : 'var(--danger)', marginBottom: '0.5rem',
           }}>
             {isPositive ? '+' : ''}{scostamento.toLocaleString('it-IT')} €
           </div>
@@ -94,14 +92,11 @@ const Preventivo = () => {
             {' '}{percentuale}% rispetto al budget
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            {isPositive
-              ? '✓ Performance superiore alle aspettative.'
-              : '⚠ Performance inferiore al budget prefissato.'}
+            {isPositive ? '✓ Performance superiore alle aspettative.' : '⚠ Performance inferiore al budget prefissato.'}
           </p>
         </div>
       </div>
 
-      {/* Tabella categorie */}
       <div className="card animate-in">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: 12 }}>
           <h3 style={{ color: 'var(--text-bright)', margin: 0, fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -109,8 +104,7 @@ const Preventivo = () => {
           </h3>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
-              type="text"
-              value={newNome}
+              type="text" value={newNome}
               onChange={e => setNewNome(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addCat()}
               placeholder="Nuova categoria..."
