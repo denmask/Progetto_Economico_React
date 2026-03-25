@@ -206,42 +206,28 @@ const Report = () => {
     })),
   };
 
-const exportPDF = () => {
-  const input = reportRef.current;
-  
-  // 1. Aggiungiamo una classe temporanea per forzare lo stile "stampa"
-  input.classList.add('pdf-export-mode');
-
-  html2canvas(input, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: '#ffffff', // Forza sfondo bianco nel canvas
-    logging: false,
-    onclone: (clonedDoc) => {
-      // Opzionale: puoi manipolare il clone qui se necessario
-      const el = clonedDoc.querySelector('.pdf-export-mode');
-      if (el) el.style.color = '#000000'; 
-    }
-  }).then((canvas) => {
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-    
-    const imgFinalWidth = imgWidth * ratio;
-    const imgFinalHeight = imgHeight * ratio;
-    
-    pdf.addImage(imgData, 'PNG', 0, 0, imgFinalWidth, imgFinalHeight);
-    pdf.save(`Report_Finanziario_${state.annoSelezionato}.pdf`);
-    
-    // 2. Rimuoviamo la classe temporanea
-    input.classList.remove('pdf-export-mode');
-  });
-};
+  const exportPDF = () => {
+    const input = reportRef.current;
+    html2canvas(input, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#080c14',
+      logging: false,
+    }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgFinalWidth = imgWidth * ratio;
+      const imgFinalHeight = imgHeight * ratio;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgFinalWidth, imgFinalHeight);
+      pdf.save(`Report_Finanziario_${state.annoSelezionato}.pdf`);
+    });
+  };
 
   const tabStyle = (active) => ({
     display: 'inline-flex', alignItems: 'center', gap: 6,

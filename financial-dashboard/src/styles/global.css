@@ -423,34 +423,3 @@ p  { color: var(--text); font-size: 0.92rem; line-height: 1.75; }
   .anno-selector { gap: 8px; }
   .anno-tab { font-size: 0.72rem; padding: 0.32rem 0.65rem; }
 }
-
-/* Stili specifici per l'esportazione PDF */
-.pdf-export-mode {
-    background-color: #ffffff !important;
-    color: #1a1a1a !important;
-}
-
-.pdf-export-mode .card {
-    background-color: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    box-shadow: none !important;
-}
-
-.pdf-export-mode h1, 
-.pdf-export-mode h2, 
-.pdf-export-mode h3, 
-.pdf-export-mode h4,
-.pdf-export-mode span,
-.pdf-export-mode td {
-    color: #000000 !important;
-}
-
-.pdf-export-mode .text-muted {
-    color: #64748b !important;
-}
-
-/* Nasconde elementi che non vuoi nel PDF (es. i bottoni per cambiare grafico) */
-.pdf-export-mode button {
-    display: none !important;
-}
-
