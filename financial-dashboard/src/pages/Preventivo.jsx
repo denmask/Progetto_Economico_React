@@ -26,12 +26,22 @@ const Preventivo = () => {
   };
 
   const updateCat = (id, field, val) => {
-    setCategorie(prev => prev.map(c => c.id === id ? { ...c, [field]: parseFloat(val) || 0 } : c));
+    const value = parseFloat(val) || 0;
+    setCategorie(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
   };
 
+  // FUNZIONE AGGIUNGI CORRETTA
   const addCat = () => {
     if (!newNome.trim()) return;
-    setCategorie(prev => [...prev, { id: Date.now(), nome: newNome.trim(), budget: 0, consuntivo: 0 }]);
+    
+    const nuovaCategoria = { 
+      id: Date.now(), 
+      nome: newNome.trim(), 
+      budget: 0, 
+      consuntivo: 0 
+    };
+    
+    setCategorie([...categorie, nuovaCategoria]);
     setNewNome('');
   };
 
