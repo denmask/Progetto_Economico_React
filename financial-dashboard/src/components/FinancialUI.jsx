@@ -15,9 +15,7 @@ function useMountClass(className) {
     applied.current = true;
     const el = ref.current;
     el.classList.add(className);
-    const remove = () => el.classList.remove(className);
-    el.addEventListener('animationend', remove, { once: true });
-    return () => el.removeEventListener('animationend', remove);
+    el.addEventListener('animationend', () => el.classList.remove(className), { once: true });
   }, []);
 
   return ref;
@@ -36,7 +34,9 @@ export const FieldGroup = ({ label, color = 'blue', icon, children, subtotal, de
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {subtotal !== undefined && (
             <span style={{
-              fontFamily: 'var(--mono)', fontSize: '0.85rem', fontWeight: 700,
+              fontFamily: 'var(--mono)',
+              fontSize: '0.85rem',
+              fontWeight: 700,
               color: color === 'green' ? 'var(--success)' : color === 'red' ? 'var(--danger)' : 'var(--primary)',
             }}>
               {fmt(subtotal)}
@@ -52,7 +52,7 @@ export const FieldGroup = ({ label, color = 'blue', icon, children, subtotal, de
   );
 };
 
-export const Field = ({ label, name, value, onChange, hint, allowNegative = false }) => {
+export const Field = ({ label, name, value, onChange, hint }) => {
   const [display, setDisplay] = useState(
     value === 0 || value === '' || value == null ? '' : String(value)
   );
@@ -62,30 +62,22 @@ export const Field = ({ label, name, value, onChange, hint, allowNegative = fals
     setDisplay(num === 0 ? '' : String(num));
   }, [value]);
 
-  const emit = useCallback(
-    (num) => {
-      const truncated = Math.trunc(num);
-      const safe = isNaN(truncated) ? 0 : truncated;
-      onChange({ target: { name, value: String(safe) } });
-      return safe;
-    },
-    [name, onChange]
-  );
+  const emit = useCallback((num) => {
+    const safe = isNaN(Math.trunc(num)) ? 0 : Math.trunc(num);
+    onChange({ target: { name, value: String(safe) } });
+    return safe;
+  }, [name, onChange]);
 
   const handleChange = (e) => {
     const raw = e.target.value;
     setDisplay(raw);
-    if (raw === '' || raw === '-') {
-      emit(0);
-      return;
-    }
+    if (raw === '' || raw === '-') { emit(0); return; }
     const n = parseFloat(raw);
     if (!isNaN(n)) emit(n);
   };
 
   const handleBlur = (e) => {
-    const n = parseFloat(e.target.value);
-    const safe = isNaN(n) ? 0 : Math.trunc(n);
+    const safe = isNaN(parseFloat(e.target.value)) ? 0 : Math.trunc(parseFloat(e.target.value));
     setDisplay(safe === 0 ? '' : String(safe));
     emit(safe);
   };
@@ -95,17 +87,13 @@ export const Field = ({ label, name, value, onChange, hint, allowNegative = fals
   const displayRef = useRef(display);
   useEffect(() => { displayRef.current = display; }, [display]);
 
-  const spin = useCallback(
-    (dir) => {
-      const cur = parseFloat(displayRef.current) || 0;
-      const next = Math.trunc(cur) + dir;
-      const str = next === 0 ? '' : String(next);
-      setDisplay(str);
-      displayRef.current = str;
-      emit(next);
-    },
-    [emit]
-  );
+  const spin = useCallback((dir) => {
+    const next = Math.trunc(parseFloat(displayRef.current) || 0) + dir;
+    const str = next === 0 ? '' : String(next);
+    setDisplay(str);
+    displayRef.current = str;
+    emit(next);
+  }, [emit]);
 
   const startPress = (dir) => {
     spin(dir);
@@ -135,7 +123,6 @@ export const Field = ({ label, name, value, onChange, hint, allowNegative = fals
         >
           −
         </button>
-
         <input
           type="text"
           inputMode="numeric"
@@ -146,7 +133,6 @@ export const Field = ({ label, name, value, onChange, hint, allowNegative = fals
           onBlur={handleBlur}
           autoComplete="off"
         />
-
         <button
           type="button"
           className="field-spin-btn"
@@ -175,9 +161,10 @@ export const SubtotalRow = ({ label, value, isTotal = false, color }) => {
     cyan: 'var(--accent)', purple: 'var(--purple)', warning: 'var(--warning)',
   };
   const c = colorMap[color] || 'var(--text-bright)';
+
   return (
     <div
-      className={`subtotal-row${isTotal ? ' total' : ''}`}
+      className={`subtotal-row${isTotal ? ` total ${color}` : ''}`}
       style={isTotal && color ? { borderColor: `${c}40`, background: `${c}10` } : {}}
     >
       <span style={{ color: isTotal ? c : 'var(--text)', fontFamily: 'var(--font)' }}>
@@ -205,6 +192,7 @@ export const KpiCard = ({ label, value, sub, color = 'blue', icon }) => {
           </span>
         )}
       </div>
+      <div className="kpi-inner-glow" />
       <div className="kpi-value">
         {typeof value === 'number'
           ? value.toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €'

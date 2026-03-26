@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import FinancialContext from '../context/FinancialContext';
 import { ANNI } from '../context/FinancialContext';
 import { Download, FileText, TrendingUp, Scale, Target, AlertTriangle, BarChart2, LineChart } from 'lucide-react';
@@ -11,23 +11,17 @@ import { Bar, Line } from 'react-chartjs-2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-ChartJS.register(
-  CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, Title, Tooltip, Legend, Filler
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler);
 
-const sum = (...args) => args.reduce((a, b) => a + (b || 0), 0);
-const fmt = (n) => (n || 0).toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
+const sum  = (...args) => args.reduce((a, b) => a + (b || 0), 0);
+const fmt  = (n) => (n || 0).toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
 const fmtK = (n) => {
   const v = n || 0;
   if (Math.abs(v) >= 1000000) return (v / 1000000).toFixed(1) + 'M';
-  if (Math.abs(v) >= 1000) return (v / 1000).toFixed(0) + 'K';
+  if (Math.abs(v) >= 1000)    return (v / 1000).toFixed(0) + 'K';
   return v.toLocaleString('it-IT');
 };
-const fmtPDF = (n) => {
-  const v = n || 0;
-  return v.toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
-};
+const fmtPDF = (n) => (n || 0).toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
 
 const Row = ({ label, value, color, bold }) => (
   <div style={{
@@ -43,36 +37,33 @@ const Row = ({ label, value, color, bold }) => (
 );
 
 const computeCE = (ce) => {
-  const totaleA = sum(ce.ricaviVendite, ce.variazioneProdotti, ce.variazioneWIP,
-    ce.incrementoImmobilizzazioni, ce.altriRicavi, ce.contributiConto,
-    ce.plusvalenzeAlienazioni, ce.canoniLocazione, ce.interessiAttivi, ce.dividendi, ce.proventiFinanziari);
+  const totaleA       = sum(ce.ricaviVendite, ce.variazioneProdotti, ce.variazioneWIP, ce.incrementoImmobilizzazioni, ce.altriRicavi, ce.contributiConto, ce.plusvalenzeAlienazioni, ce.canoniLocazione, ce.interessiAttivi, ce.dividendi, ce.proventiFinanziari);
   const costiAcquisti = sum(ce.acquistiMerci, ce.acquistMateriePrime, ce.variazioneRimanenzeMerci);
-  const costiServizi = sum(ce.serviziEsterniAmm, ce.utenzeTel, ce.consulenze, ce.assicurazioni, ce.manutRiparazioni, ce.serviziMarketing);
-  const costiGodimento = sum(ce.godimentoBeniTerzi, ce.fittiBeni, ce.leasing);
-  const costiPersonale = sum(ce.salariStipendi, ce.oneriSociali, ce.tfr, ce.altriCostPersonale);
-  const ammortamenti = sum(ce.ammortImmMateriali, ce.ammortImmImmateriali, ce.svalutazioniCrediti, ce.altriAccantonamenti);
-  const totaleB = sum(costiAcquisti, costiServizi, costiGodimento, costiPersonale, ammortamenti, ce.oneriDiversiGestione);
-  const ebitda = totaleA - sum(costiAcquisti, costiServizi, costiGodimento, costiPersonale, ce.oneriDiversiGestione);
-  const ebit = ebitda - ammortamenti;
+  const costiServizi  = sum(ce.serviziEsterniAmm, ce.utenzeTel, ce.consulenze, ce.assicurazioni, ce.manutRiparazioni, ce.serviziMarketing);
+  const costiGodimento= sum(ce.godimentoBeniTerzi, ce.fittiBeni, ce.leasing);
+  const costiPersonale= sum(ce.salariStipendi, ce.oneriSociali, ce.tfr, ce.altriCostPersonale);
+  const ammortamenti  = sum(ce.ammortImmMateriali, ce.ammortImmImmateriali, ce.svalutazioniCrediti, ce.altriAccantonamenti);
+  const totaleB       = sum(costiAcquisti, costiServizi, costiGodimento, costiPersonale, ammortamenti, ce.oneriDiversiGestione);
+  const ebitda        = totaleA - sum(costiAcquisti, costiServizi, costiGodimento, costiPersonale, ce.oneriDiversiGestione);
+  const ebit          = ebitda - ammortamenti;
   const oneriFinanziari = sum(ce.oneriInteressi, ce.oneriMutui, ce.oneriLeasing, ce.perditeValori);
   const totaleImposte = sum(ce.irap, ce.ires, ce.altreImposte);
-  const utile = ebit - oneriFinanziari - totaleImposte;
+  const utile         = ebit - oneriFinanziari - totaleImposte;
   return { totaleA, totaleB, ebitda, ebit, oneriFinanziari, totaleImposte, utile, costiAcquisti, costiServizi, costiGodimento, costiPersonale, ammortamenti };
 };
 
 const computeSP = (sp) => {
-  const totaleImmobilizzato = sum(sp.fabbricati, sp.impianti, sp.macchinari, sp.attrezzature, sp.autoveicoli,
-    sp.avviamento, sp.brevetti, sp.immImmateriali, sp.partecipazioni, sp.creditiFinanzLungo, sp.immFinanziarie);
-  const disponibilita = sum(sp.cassa, sp.bancaCC, sp.altreDisponibilita, sp.titoliQuotati);
-  const crediti = sum(sp.creditiClienti, sp.creditiAltri, sp.creditiTributo, sp.creditiPrevidenziali);
-  const rimanenze = sum(sp.rimanenzeMerci, sp.rimanenzeMP, sp.rimanenzeSemilavorati, sp.rimanenzeProdotti);
-  const totaleCircolante = sum(disponibilita, crediti, rimanenze, sp.risconiAttivi, sp.rateiAttivi);
-  const totaleAttivo = sum(totaleImmobilizzato, totaleCircolante);
-  const patrimonioNetto = sum(sp.capitaleSociale, sp.riservaLegale, sp.riserveStatutarie, sp.riserveStraodinarie, sp.utiliPrecedenti) - (sp.perditePrecedenti || 0);
-  const debitiBreve = sum(sp.debitiBanche, sp.debitiFornitori, sp.debitiTributari, sp.debitiPrevidenziali, sp.debitiVsDipendenti, sp.altriDebitiBreve);
-  const debitiLungo = sum(sp.mutui, sp.debitiLeasing, sp.obbligazioni, sp.debitiLungo);
-  const fondi = sum(sp.fondoTFR, sp.fondoRischi, sp.fondoImposte, sp.fondoSvalutazione);
-  const totaleFonti = sum(patrimonioNetto, debitiBreve, debitiLungo, fondi);
+  const totaleImmobilizzato = sum(sp.fabbricati, sp.impianti, sp.macchinari, sp.attrezzature, sp.autoveicoli, sp.avviamento, sp.brevetti, sp.immImmateriali, sp.partecipazioni, sp.creditiFinanzLungo, sp.immFinanziarie);
+  const disponibilita       = sum(sp.cassa, sp.bancaCC, sp.altreDisponibilita, sp.titoliQuotati);
+  const crediti             = sum(sp.creditiClienti, sp.creditiAltri, sp.creditiTributo, sp.creditiPrevidenziali);
+  const rimanenze           = sum(sp.rimanenzeMerci, sp.rimanenzeMP, sp.rimanenzeSemilavorati, sp.rimanenzeProdotti);
+  const totaleCircolante    = sum(disponibilita, crediti, rimanenze, sp.risconiAttivi, sp.rateiAttivi);
+  const totaleAttivo        = sum(totaleImmobilizzato, totaleCircolante);
+  const patrimonioNetto     = sum(sp.capitaleSociale, sp.riservaLegale, sp.riserveStatutarie, sp.riserveStraodinarie, sp.utiliPrecedenti) - (sp.perditePrecedenti || 0);
+  const debitiBreve         = sum(sp.debitiBanche, sp.debitiFornitori, sp.debitiTributari, sp.debitiPrevidenziali, sp.debitiVsDipendenti, sp.altriDebitiBreve);
+  const debitiLungo         = sum(sp.mutui, sp.debitiLeasing, sp.obbligazioni, sp.debitiLungo);
+  const fondi               = sum(sp.fondoTFR, sp.fondoRischi, sp.fondoImposte, sp.fondoSvalutazione);
+  const totaleFonti         = sum(patrimonioNetto, debitiBreve, debitiLungo, fondi);
   return { totaleImmobilizzato, totaleCircolante, totaleAttivo, patrimonioNetto, debitiBreve, debitiLungo, fondi, totaleFonti };
 };
 
@@ -83,7 +74,7 @@ const CHART_COLORS = {
   '2025-26': { bar: 'rgba(15,212,148,0.75)',  border: '#0fd494' },
 };
 
-const chartBaseOptions = {
+const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -107,7 +98,7 @@ const chartBaseOptions = {
   scales: {
     x: {
       ticks: { color: '#6a7a9b', font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 } },
-      grid: { color: 'rgba(255,255,255,0.04)' },
+      grid:  { color: 'rgba(255,255,255,0.04)' },
     },
     y: {
       ticks: {
@@ -144,13 +135,24 @@ const Report = () => {
 
   const datiStorici = ANNI.map(anno => ({
     anno,
-    ce: computeCE(anni[anno].contoEconomico),
-    sp: computeSP(anni[anno].statoPatrimoniale),
+    ce:   computeCE(anni[anno].contoEconomico),
+    sp:   computeSP(anni[anno].statoPatrimoniale),
     prev: anni[anno].preventivo,
   }));
 
-  const hasAnyData = datiStorici.some(d => d.ce.totaleA > 0 || d.sp.totaleAttivo > 0);
+  const hasAnyData     = datiStorici.some(d => d.ce.totaleA > 0 || d.sp.totaleAttivo > 0);
   const hasCurrentData = ceData.totaleA > 0 || spData.totaleAttivo > 0;
+
+  const buildBarData = (metriche) => ({
+    labels: metriche.map(m => m.label),
+    datasets: ANNI.map(anno => ({
+      label: anno,
+      data: metriche.map(m => datiStorici.find(d => d.anno === anno)[anno.includes('ce') ? 'ce' : 'ce'][m.key]),
+      backgroundColor: CHART_COLORS[anno].bar,
+      borderColor: CHART_COLORS[anno].border,
+      borderWidth: 1, borderRadius: 5,
+    })),
+  });
 
   const barDataCE = {
     labels: METRICHE_CE.map(m => m.label),
@@ -197,21 +199,15 @@ const Report = () => {
   };
 
   const exportPDF = () => {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pw = doc.internal.pageSize.getWidth();
-    const ph = doc.internal.pageSize.getHeight();
+    const doc    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw     = doc.internal.pageSize.getWidth();
+    const ph     = doc.internal.pageSize.getHeight();
     const margin = 18;
-    const col = pw - margin * 2;
-    let y = margin;
+    const col    = pw - margin * 2;
+    let y        = margin;
 
-    const addPage = () => {
-      doc.addPage();
-      y = margin;
-    };
-
-    const checkY = (needed = 10) => {
-      if (y + needed > ph - margin) addPage();
-    };
+    const addPage  = () => { doc.addPage(); y = margin; };
+    const checkY   = (needed = 10) => { if (y + needed > ph - margin) addPage(); };
 
     const drawHeader = () => {
       doc.setFillColor(245, 247, 252);
@@ -225,9 +221,7 @@ const Report = () => {
       doc.setTextColor(120, 130, 155);
       doc.text(
         `Generato il ${new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}  |  Esercizi ${ANNI[0]} – ${ANNI[ANNI.length - 1]}`,
-        pw - margin,
-        14,
-        { align: 'right' }
+        pw - margin, 14, { align: 'right' }
       );
       doc.setDrawColor(200, 210, 230);
       doc.setLineWidth(0.3);
@@ -248,25 +242,21 @@ const Report = () => {
     };
 
     drawHeader();
-
     sectionTitle('RIEPILOGO KPI — CONFRONTO STORICO ' + ANNI[0] + ' / ' + ANNI[ANNI.length - 1]);
-
-    const kpiHead = [['Metrica', ...ANNI]];
-    const kpiRows = [
-      ['Valore della Produzione', ...datiStorici.map(d => fmtPDF(d.ce.totaleA))],
-      ['EBITDA',                  ...datiStorici.map(d => fmtPDF(d.ce.ebitda))],
-      ['EBIT',                    ...datiStorici.map(d => fmtPDF(d.ce.ebit))],
-      ["Utile d'Esercizio",       ...datiStorici.map(d => fmtPDF(d.ce.utile))],
-      ['Totale Attivo',           ...datiStorici.map(d => fmtPDF(d.sp.totaleAttivo))],
-      ['Patrimonio Netto',        ...datiStorici.map(d => fmtPDF(d.sp.patrimonioNetto))],
-      ['Debiti a Breve',          ...datiStorici.map(d => fmtPDF(d.sp.debitiBreve))],
-      ['Debiti a Lungo',          ...datiStorici.map(d => fmtPDF(d.sp.debitiLungo))],
-    ];
 
     autoTable(doc, {
       startY: y,
-      head: kpiHead,
-      body: kpiRows,
+      head: [['Metrica', ...ANNI]],
+      body: [
+        ['Valore della Produzione', ...datiStorici.map(d => fmtPDF(d.ce.totaleA))],
+        ['EBITDA',                  ...datiStorici.map(d => fmtPDF(d.ce.ebitda))],
+        ['EBIT',                    ...datiStorici.map(d => fmtPDF(d.ce.ebit))],
+        ["Utile d'Esercizio",       ...datiStorici.map(d => fmtPDF(d.ce.utile))],
+        ['Totale Attivo',           ...datiStorici.map(d => fmtPDF(d.sp.totaleAttivo))],
+        ['Patrimonio Netto',        ...datiStorici.map(d => fmtPDF(d.sp.patrimonioNetto))],
+        ['Debiti a Breve',          ...datiStorici.map(d => fmtPDF(d.sp.debitiBreve))],
+        ['Debiti a Lungo',          ...datiStorici.map(d => fmtPDF(d.sp.debitiLungo))],
+      ],
       margin: { left: margin, right: margin },
       styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 3.5, textColor: [40, 50, 80] },
       headStyles: { fillColor: [235, 240, 255], textColor: [30, 40, 100], fontStyle: 'bold', halign: 'center' },
@@ -278,10 +268,9 @@ const Report = () => {
       alternateRowStyles: { fillColor: [248, 250, 255] },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index > 0) {
-          const raw = datiStorici[data.column.index - 1];
-          const keys = ['totaleA','ebitda','ebit','utile','totaleAttivo','patrimonioNetto','debitiBreve','debitiLungo'];
+          const keys    = ['totaleA','ebitda','ebit','utile','totaleAttivo','patrimonioNetto','debitiBreve','debitiLungo'];
           const sources = [d => d.ce, d => d.ce, d => d.ce, d => d.ce, d => d.sp, d => d.sp, d => d.sp, d => d.sp];
-          const val = sources[data.row.index](raw)[keys[data.row.index]];
+          const val     = sources[data.row.index](datiStorici[data.column.index - 1])[keys[data.row.index]];
           if (val < 0) data.cell.styles.textColor = [200, 40, 40];
           else if (val > 0 && [1,2,3,5].includes(data.row.index)) data.cell.styles.textColor = [20, 130, 80];
         }
@@ -291,7 +280,7 @@ const Report = () => {
     y = doc.lastAutoTable.finalY + 12;
 
     ANNI.forEach((anno, idx) => {
-      const d = datiStorici[idx];
+      const d     = datiStorici[idx];
       const hasCE = d.ce.totaleA > 0;
       const hasSP = d.sp.totaleAttivo > 0;
       if (!hasCE && !hasSP) return;
@@ -309,18 +298,18 @@ const Report = () => {
         sectionTitle('Conto Economico — Art. 2425 c.c.', [20, 60, 160]);
 
         const ceRows = [
-          ['A — Valore della Produzione',   fmtPDF(d.ce.totaleA),          true],
+          ['A — Valore della Produzione',   fmtPDF(d.ce.totaleA),        true],
           ['  di cui: Ricavi Vendite',       fmtPDF(anni[anno].contoEconomico.ricaviVendite || 0), false],
-          ['B — Costi della Produzione',    fmtPDF(d.ce.totaleB),          true],
-          ['  di cui: Acquisti',            fmtPDF(d.ce.costiAcquisti),    false],
-          ['  di cui: Servizi Esterni',     fmtPDF(d.ce.costiServizi),     false],
-          ['  di cui: Personale',           fmtPDF(d.ce.costiPersonale),   false],
-          ['  di cui: Ammortamenti',        fmtPDF(d.ce.ammortamenti),     false],
-          ['EBITDA',                        fmtPDF(d.ce.ebitda),           true],
-          ['EBIT (Risultato Operativo)',    fmtPDF(d.ce.ebit),             true],
-          ['C — Oneri Finanziari',          fmtPDF(d.ce.oneriFinanziari),  false],
-          ['E — Imposte d\'Esercizio',      fmtPDF(d.ce.totaleImposte),    false],
-          ["Utile / Perdita d'Esercizio",   fmtPDF(d.ce.utile),            true],
+          ['B — Costi della Produzione',    fmtPDF(d.ce.totaleB),        true],
+          ['  di cui: Acquisti',            fmtPDF(d.ce.costiAcquisti),  false],
+          ['  di cui: Servizi Esterni',     fmtPDF(d.ce.costiServizi),   false],
+          ['  di cui: Personale',           fmtPDF(d.ce.costiPersonale), false],
+          ['  di cui: Ammortamenti',        fmtPDF(d.ce.ammortamenti),   false],
+          ['EBITDA',                        fmtPDF(d.ce.ebitda),         true],
+          ['EBIT (Risultato Operativo)',    fmtPDF(d.ce.ebit),           true],
+          ['C — Oneri Finanziari',          fmtPDF(d.ce.oneriFinanziari),false],
+          ["E — Imposte d'Esercizio",       fmtPDF(d.ce.totaleImposte),  false],
+          ["Utile / Perdita d'Esercizio",   fmtPDF(d.ce.utile),          true],
         ];
 
         autoTable(doc, {
@@ -334,18 +323,15 @@ const Report = () => {
           alternateRowStyles: { fillColor: [250, 252, 255] },
           didParseCell: (data) => {
             if (data.section === 'body') {
-              const isBold = ceRows[data.row.index][2];
-              if (isBold) {
-                data.cell.styles.fontStyle = 'bold';
-                data.cell.styles.fillColor = [240, 245, 255];
+              if (ceRows[data.row.index][2]) {
+                data.cell.styles.fontStyle  = 'bold';
+                data.cell.styles.fillColor  = [240, 245, 255];
               }
               if (data.column.index === 1) {
-                const raw = datiStorici[idx];
                 const vals = [d.ce.totaleA, anni[anno].contoEconomico.ricaviVendite, d.ce.totaleB,
                   d.ce.costiAcquisti, d.ce.costiServizi, d.ce.costiPersonale, d.ce.ammortamenti,
                   d.ce.ebitda, d.ce.ebit, d.ce.oneriFinanziari, d.ce.totaleImposte, d.ce.utile];
-                const v = vals[data.row.index] || 0;
-                if (v < 0) data.cell.styles.textColor = [200, 40, 40];
+                if ((vals[data.row.index] || 0) < 0) data.cell.styles.textColor = [200, 40, 40];
               }
             }
           },
@@ -361,7 +347,7 @@ const Report = () => {
           ['ATTIVO', '', true],
           ['Immobilizzazioni (nette)', fmtPDF(d.sp.totaleImmobilizzato), false],
           ['Attivo Circolante',        fmtPDF(d.sp.totaleCircolante),    false],
-          ['TOTALE ATTIVO',            fmtPDF(d.sp.totaleAttivo),         true],
+          ['TOTALE ATTIVO',            fmtPDF(d.sp.totaleAttivo),        true],
           ['PASSIVO E NETTO', '', true],
           ['Patrimonio Netto',         fmtPDF(d.sp.patrimonioNetto),     false],
           ['Debiti a Breve Termine',   fmtPDF(d.sp.debitiBreve),         false],
@@ -370,10 +356,8 @@ const Report = () => {
           ['TOTALE PASSIVO + NETTO',   fmtPDF(d.sp.totaleFonti),         true],
         ];
 
-        const solidita = d.sp.totaleFonti > 0
-          ? ((d.sp.patrimonioNetto / d.sp.totaleFonti) * 100).toFixed(1) + '%'
-          : '—';
-        const leva = (d.sp.debitiBreve + d.sp.debitiLungo) > 0 && d.sp.patrimonioNetto > 0
+        const solidita = d.sp.totaleFonti > 0 ? ((d.sp.patrimonioNetto / d.sp.totaleFonti) * 100).toFixed(1) + '%' : '—';
+        const leva     = (d.sp.debitiBreve + d.sp.debitiLungo) > 0 && d.sp.patrimonioNetto > 0
           ? ((d.sp.debitiBreve + d.sp.debitiLungo) / d.sp.patrimonioNetto).toFixed(2) + 'x'
           : '—';
 
@@ -387,14 +371,10 @@ const Report = () => {
           columnStyles: { 0: { cellWidth: col * 0.72 }, 1: { halign: 'right', fontStyle: 'bold' } },
           alternateRowStyles: { fillColor: [248, 253, 250] },
           didParseCell: (data) => {
-            if (data.section === 'body') {
-              const isBold = spRows[data.row.index][2];
-              const isEmpty = spRows[data.row.index][1] === '';
-              if (isBold || isEmpty) {
-                data.cell.styles.fontStyle = 'bold';
-                data.cell.styles.fillColor = [225, 245, 232];
-                data.cell.styles.textColor = [20, 80, 50];
-              }
+            if (data.section === 'body' && (spRows[data.row.index][2] || spRows[data.row.index][1] === '')) {
+              data.cell.styles.fontStyle  = 'bold';
+              data.cell.styles.fillColor  = [225, 245, 232];
+              data.cell.styles.textColor  = [20, 80, 50];
             }
           },
         });
@@ -417,16 +397,12 @@ const Report = () => {
       }
     });
 
-    checkY(20);
     doc.setFillColor(245, 247, 252);
     doc.rect(0, ph - 14, pw, 14, 'F');
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(140, 150, 175);
-    doc.text(
-      'Report generato da FinDash — Denis Mascherin | Stage Front-End Developer 2026. Dati gestiti lato client tramite localStorage.',
-      margin, ph - 5
-    );
+    doc.text('Report generato da FinDash — Denis Mascherin | Stage Front-End Developer 2026.', margin, ph - 5);
     doc.text(`Pagina ${doc.internal.getCurrentPageInfo().pageNumber}`, pw - margin, ph - 5, { align: 'right' });
 
     doc.save(`Report_Finanziario_${ANNI[0]}_${ANNI[ANNI.length - 1]}.pdf`);
@@ -454,8 +430,7 @@ const Report = () => {
             </h1>
             <p style={{ marginTop: 6 }}>Riepilogo consolidato e confronto storico 2022–2026</p>
           </div>
-          <button className="btn btn-primary" onClick={exportPDF} disabled={!hasAnyData}
-            style={{ opacity: hasAnyData ? 1 : 0.4 }}>
+          <button className="btn btn-primary" onClick={exportPDF} disabled={!hasAnyData} style={{ opacity: hasAnyData ? 1 : 0.4 }}>
             <Download size={16}/> Esporta PDF
           </button>
         </div>
@@ -479,8 +454,7 @@ const Report = () => {
             </div>
             <h2 style={{ color: 'var(--text-bright)', marginBottom: '0.4rem', fontSize: '1.5rem', fontWeight: 800 }}>Prospetto Finanziario</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Generato il {new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
-              {' '}— Esercizi {ANNI[0]} / {ANNI[ANNI.length - 1]}
+              Generato il {new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })} — Esercizi {ANNI[0]} / {ANNI[ANNI.length - 1]}
             </p>
           </div>
 
@@ -490,8 +464,8 @@ const Report = () => {
                 📈 Confronto Storico — {ANNI[0]} / {ANNI[ANNI.length - 1]}
               </h3>
               <div style={{ display: 'flex', gap: 4, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: 8, padding: 3 }}>
-                <button style={tabStyle(chartView === 'bar')} onClick={() => setChartView('bar')}><BarChart2 size={13}/> Barre</button>
-                <button style={tabStyle(chartView === 'line')} onClick={() => setChartView('line')}><LineChart size={13}/> Linee</button>
+                <button style={tabStyle(chartView === 'bar')}  onClick={() => setChartView('bar')}>  <BarChart2  size={13}/> Barre</button>
+                <button style={tabStyle(chartView === 'line')} onClick={() => setChartView('line')}> <LineChart  size={13}/> Linee</button>
               </div>
             </div>
 
@@ -501,7 +475,7 @@ const Report = () => {
                   <TrendingUp size={13} style={{ display: 'inline', marginRight: 5, color: 'var(--primary)' }}/>Conto Economico
                 </div>
                 <div style={{ height: 260 }}>
-                  {chartView === 'bar' ? <Bar data={barDataCE} options={chartBaseOptions} /> : <Line data={lineDataCE} options={chartBaseOptions} />}
+                  {chartView === 'bar' ? <Bar  data={barDataCE}  options={chartOptions} /> : <Line data={lineDataCE} options={chartOptions} />}
                 </div>
               </div>
               <div className="storico-chart-wrap">
@@ -509,7 +483,7 @@ const Report = () => {
                   <Scale size={13} style={{ display: 'inline', marginRight: 5, color: 'var(--accent)' }}/>Stato Patrimoniale
                 </div>
                 <div style={{ height: 260 }}>
-                  {chartView === 'bar' ? <Bar data={barDataSP} options={chartBaseOptions} /> : <Line data={lineDataSP} options={chartBaseOptions} />}
+                  {chartView === 'bar' ? <Bar  data={barDataSP}  options={chartOptions} /> : <Line data={lineDataSP} options={chartOptions} />}
                 </div>
               </div>
             </div>
@@ -529,23 +503,23 @@ const Report = () => {
                 </thead>
                 <tbody>
                   {[
-                    { label: 'Valore Produzione', fn: d => d.ce.totaleA, color: 'var(--primary)' },
-                    { label: 'EBITDA',             fn: d => d.ce.ebitda,  color: 'var(--success)' },
-                    { label: 'EBIT',               fn: d => d.ce.ebit,    color: 'var(--accent)' },
-                    { label: "Utile d'Esercizio",  fn: d => d.ce.utile,   color: 'var(--purple)' },
-                    { label: 'Totale Attivo',       fn: d => d.sp.totaleAttivo,    color: 'var(--primary)' },
-                    { label: 'Patrimonio Netto',    fn: d => d.sp.patrimonioNetto, color: 'var(--success)' },
+                    { label: 'Valore Produzione', fn: d => d.ce.totaleA,          color: 'var(--primary)' },
+                    { label: 'EBITDA',             fn: d => d.ce.ebitda,           color: 'var(--success)' },
+                    { label: 'EBIT',               fn: d => d.ce.ebit,             color: 'var(--accent)'  },
+                    { label: "Utile d'Esercizio",  fn: d => d.ce.utile,            color: 'var(--purple)'  },
+                    { label: 'Totale Attivo',      fn: d => d.sp.totaleAttivo,     color: 'var(--primary)' },
+                    { label: 'Patrimonio Netto',   fn: d => d.sp.patrimonioNetto,  color: 'var(--success)' },
                   ].map(({ label, fn, color }) => (
-                    <tr key={label} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+                    <tr key={label}
+                      style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <td style={{ padding: '0.5rem 0.7rem', color: 'var(--text)', fontSize: '0.82rem' }}>{label}</td>
                       {ANNI.map(anno => {
-                        const d = datiStorici.find(x => x.anno === anno);
-                        const v = fn(d);
+                        const v = fn(datiStorici.find(x => x.anno === anno));
                         return (
-                          <td key={anno} style={{ padding: '0.5rem 0.7rem', textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 600, color: v === 0 ? 'var(--text-muted)' : (v < 0 ? 'var(--danger)' : color), fontSize: '0.8rem' }}>
+                          <td key={anno} style={{ padding: '0.5rem 0.7rem', textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 600, color: v === 0 ? 'var(--text-muted)' : v < 0 ? 'var(--danger)' : color, fontSize: '0.8rem' }}>
                             {v === 0 ? '—' : fmt(v)}
                           </td>
                         );
@@ -573,33 +547,34 @@ const Report = () => {
                     <TrendingUp size={18} color="var(--primary)" />
                     <h3 style={{ color: 'var(--text-bright)', margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Conto Economico</h3>
                   </div>
-                  <Row label="Valore della Produzione" value={ceData.totaleA} />
-                  <Row label="Totale Costi Operativi" value={ceData.totaleB} />
-                  <Row label="EBITDA" value={ceData.ebitda} color={ceData.ebitda >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
-                  <Row label="EBIT (Risultato Operativo)" value={ceData.ebit} color={ceData.ebit >= 0 ? 'var(--accent)' : 'var(--danger)'} />
-                  <Row label="Oneri Finanziari" value={ceData.oneriFinanziari} color="var(--warning)" />
-                  <Row label="Imposte" value={ceData.totaleImposte} color="var(--danger)" />
-                  <Row label="Utile / Perdita d'Esercizio" value={ceData.utile} color={ceData.utile >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
+                  <Row label="Valore della Produzione"    value={ceData.totaleA} />
+                  <Row label="Totale Costi Operativi"     value={ceData.totaleB} />
+                  <Row label="EBITDA"                     value={ceData.ebitda}         color={ceData.ebitda >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
+                  <Row label="EBIT (Risultato Operativo)" value={ceData.ebit}           color={ceData.ebit   >= 0 ? 'var(--accent)'  : 'var(--danger)'} />
+                  <Row label="Oneri Finanziari"           value={ceData.oneriFinanziari} color="var(--warning)" />
+                  <Row label="Imposte"                    value={ceData.totaleImposte}   color="var(--danger)" />
+                  <Row label="Utile / Perdita d'Esercizio" value={ceData.utile}         color={ceData.utile  >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
                   {ceData.totaleA > 0 && (
                     <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                       ROS: {((ceData.utile / ceData.totaleA) * 100).toFixed(1)}% | Margine EBITDA: {((ceData.ebitda / ceData.totaleA) * 100).toFixed(1)}%
                     </div>
                   )}
                 </div>
+
                 <div className="card animate-in">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.25rem' }}>
                     <Scale size={18} color="var(--accent)" />
                     <h3 style={{ color: 'var(--text-bright)', margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Stato Patrimoniale</h3>
                   </div>
-                  <Row label="Immobilizzazioni" value={spData.totaleImmobilizzato} />
-                  <Row label="Attivo Circolante" value={spData.totaleCircolante} />
-                  <Row label="Totale Attivo" value={spData.totaleAttivo} bold />
+                  <Row label="Immobilizzazioni"  value={spData.totaleImmobilizzato} />
+                  <Row label="Attivo Circolante"  value={spData.totaleCircolante} />
+                  <Row label="Totale Attivo"      value={spData.totaleAttivo}      bold />
                   <div style={{ height: 1, background: 'var(--border)', margin: '0.75rem 0' }} />
-                  <Row label="Patrimonio Netto" value={spData.patrimonioNetto} color={spData.patrimonioNetto >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
-                  <Row label="Debiti a Breve" value={spData.debitiBreve} color="var(--danger)" />
-                  <Row label="Debiti a Lungo" value={spData.debitiLungo} color="var(--warning)" />
-                  <Row label="Fondi e TFR" value={spData.fondi} />
-                  <Row label="Totale Fonti" value={spData.totaleFonti} bold />
+                  <Row label="Patrimonio Netto"   value={spData.patrimonioNetto}   color={spData.patrimonioNetto >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
+                  <Row label="Debiti a Breve"     value={spData.debitiBreve}       color="var(--danger)" />
+                  <Row label="Debiti a Lungo"     value={spData.debitiLungo}       color="var(--warning)" />
+                  <Row label="Fondi e TFR"        value={spData.fondi} />
+                  <Row label="Totale Fonti"       value={spData.totaleFonti}       bold />
                   {spData.totaleFonti > 0 && (
                     <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                       Solidità: {((spData.patrimonioNetto / spData.totaleFonti) * 100).toFixed(1)}% | Leva: {spData.debitiBreve + spData.debitiLungo > 0 ? ((spData.debitiBreve + spData.debitiLungo) / Math.max(1, spData.patrimonioNetto)).toFixed(2) : '—'}
@@ -615,20 +590,18 @@ const Report = () => {
                     <h3 style={{ color: 'var(--text-bright)', margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Preventivo</h3>
                   </div>
                   <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Budget</span>
-                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-bright)', fontSize: '1.2rem' }}>{fmt(preventivo.budget)}</div>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Consuntivo</span>
-                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-bright)', fontSize: '1.2rem' }}>{fmt(preventivo.consuntivo)}</div>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Scostamento</span>
-                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.2rem', color: (preventivo.consuntivo - preventivo.budget) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                        {(preventivo.consuntivo - preventivo.budget) >= 0 ? '+' : ''}{fmt(preventivo.consuntivo - preventivo.budget)}
+                    {[
+                      { label: 'Budget',       value: preventivo.budget,      color: 'var(--text-bright)' },
+                      { label: 'Consuntivo',   value: preventivo.consuntivo,  color: 'var(--text-bright)' },
+                      { label: 'Scostamento',  value: preventivo.consuntivo - preventivo.budget, color: (preventivo.consuntivo - preventivo.budget) >= 0 ? 'var(--success)' : 'var(--danger)' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{label}</span>
+                        <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color, fontSize: '1.2rem' }}>
+                          {label === 'Scostamento' && value >= 0 ? '+' : ''}{fmt(value)}
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -637,8 +610,7 @@ const Report = () => {
 
           <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid var(--border)' }}>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-              Report generato automaticamente da Financial Dashboard Tool — Denis Mascherin | Stage Front-End Developer 2026.
-              I dati sono gestiti esclusivamente lato client tramite localStorage. Esercizi coperti: {ANNI.join(', ')}.
+              Report generato da Financial Dashboard Tool — Denis Mascherin | Stage Front-End Developer 2026. Dati gestiti lato client tramite localStorage. Esercizi coperti: {ANNI.join(', ')}.
             </p>
           </div>
         </div>
