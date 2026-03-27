@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';
 
 const fmt = (n) => {
   if (!n && n !== 0) return '—';
@@ -7,7 +7,7 @@ const fmt = (n) => {
 };
 
 function useMountClass(className) {
-  const ref = useRef(null);
+  const ref     = useRef(null);
   const applied = useRef(false);
 
   useEffect(() => {
@@ -62,6 +62,13 @@ export const Field = ({ label, name, value, onChange, hint }) => {
     setDisplay(num === 0 ? '' : String(num));
   }, [value]);
 
+  const currentNum = parseFloat(display) || 0;
+  const inputColor = currentNum > 0
+    ? 'rgba(15,212,148,0.65)'
+    : currentNum < 0
+    ? 'rgba(255,77,106,0.65)'
+    : undefined;
+
   const emit = useCallback((num) => {
     const safe = isNaN(Math.trunc(num)) ? 0 : Math.trunc(num);
     onChange({ target: { name, value: String(safe) } });
@@ -82,14 +89,14 @@ export const Field = ({ label, name, value, onChange, hint }) => {
     emit(safe);
   };
 
-  const timerRef = useRef(null);
+  const timerRef    = useRef(null);
   const intervalRef = useRef(null);
-  const displayRef = useRef(display);
+  const displayRef  = useRef(display);
   useEffect(() => { displayRef.current = display; }, [display]);
 
   const spin = useCallback((dir) => {
     const next = Math.trunc(parseFloat(displayRef.current) || 0) + dir;
-    const str = next === 0 ? '' : String(next);
+    const str  = next === 0 ? '' : String(next);
     setDisplay(str);
     displayRef.current = str;
     emit(next);
@@ -110,7 +117,10 @@ export const Field = ({ label, name, value, onChange, hint }) => {
   return (
     <div className="field">
       <label>{label}</label>
-      <div className="field-input-wrap">
+      <div
+        className="field-input-wrap"
+        style={inputColor ? { borderColor: inputColor, boxShadow: `0 0 0 2px ${inputColor}22` } : {}}
+      >
         <button
           type="button"
           className="field-spin-btn"
@@ -132,6 +142,7 @@ export const Field = ({ label, name, value, onChange, hint }) => {
           onChange={handleChange}
           onBlur={handleBlur}
           autoComplete="off"
+          style={inputColor ? { color: inputColor } : {}}
         />
         <button
           type="button"
@@ -157,8 +168,12 @@ export const Field = ({ label, name, value, onChange, hint }) => {
 
 export const SubtotalRow = ({ label, value, isTotal = false, color }) => {
   const colorMap = {
-    green: 'var(--success)', red: 'var(--danger)', blue: 'var(--primary)',
-    cyan: 'var(--accent)', purple: 'var(--purple)', warning: 'var(--warning)',
+    green:   'var(--success)',
+    red:     'var(--danger)',
+    blue:    'var(--primary)',
+    cyan:    'var(--accent)',
+    purple:  'var(--purple)',
+    warning: 'var(--warning)',
   };
   const c = colorMap[color] || 'var(--text-bright)';
 
@@ -179,8 +194,14 @@ export const SubtotalRow = ({ label, value, isTotal = false, color }) => {
   );
 };
 
-export const KpiCard = ({ label, value, sub, color = 'blue', icon }) => {
+export const KpiCard = ({ label, value, sub, color = 'blue', icon, prevValue }) => {
   const ref = useMountClass('kpi-mount');
+
+  const hasTrend   = prevValue !== undefined && prevValue !== null && prevValue !== 0;
+  const delta      = hasTrend ? value - prevValue : 0;
+  const deltaPct   = hasTrend ? ((delta / Math.abs(prevValue)) * 100).toFixed(1) : null;
+  const trendUp    = delta >= 0;
+  const trendColor = trendUp ? 'var(--success)' : 'var(--danger)';
 
   return (
     <div className={`kpi-card ${color}`} ref={ref}>
@@ -199,6 +220,24 @@ export const KpiCard = ({ label, value, sub, color = 'blue', icon }) => {
           : value}
       </div>
       {sub && <span className="kpi-sub">{sub}</span>}
+      {hasTrend && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          marginTop: '0.4rem',
+          fontSize: '0.68rem',
+          fontFamily: 'var(--mono)',
+          fontWeight: 700,
+          color: trendColor,
+        }}>
+          {trendUp
+            ? <TrendingUp size={11} />
+            : <TrendingDown size={11} />
+          }
+          <span>{trendUp ? '+' : ''}{deltaPct}% vs anno prec.</span>
+        </div>
+      )}
     </div>
   );
 };

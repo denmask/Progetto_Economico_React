@@ -1,25 +1,27 @@
 import React, { useContext, useState } from 'react';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, BarElement,
+  Title, Tooltip, Legend,
+} from 'chart.js';
 import FinancialContext from '../context/FinancialContext';
 import AnnoSelector from '../components/AnnoSelector';
 import { Target, AlertCircle, CheckCircle2, TrendingUp, TrendingDown, Plus, Trash2 } from 'lucide-react';
 
-const fmt = (n) => (n || 0).toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-const defaultCategories = [
-  { id: 1, nome: 'Ricavi Vendite', budget: 0, consuntivo: 0 },
-  { id: 2, nome: 'Costi del Personale', budget: 0, consuntivo: 0 },
-  { id: 3, nome: 'Acquisti e Forniture', budget: 0, consuntivo: 0 },
-  { id: 4, nome: 'Servizi Esterni', budget: 0, consuntivo: 0 },
-  { id: 5, nome: 'Ammortamenti', budget: 0, consuntivo: 0 },
-  { id: 6, nome: 'Oneri Finanziari', budget: 0, consuntivo: 0 },
-];
+const fmt = (n) => (n || 0).toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
 
 const Preventivo = () => {
   const { state, dispatch } = useContext(FinancialContext);
-  const [categorie, setCategorie] = useState(defaultCategories);
   const [newNome, setNewNome] = useState('');
 
-  const { budget, consuntivo } = state.preventivo;
+  const { budget, consuntivo, categorie = [] } = state.preventivo;
+
+  const saveCategorie = (nuove) => {
+    dispatch({ type: 'UPDATE_PREV_CATEGORIE', categorie: nuove });
+  };
 
   const handleGlobalChange = (e) => {
     dispatch({ type: 'UPDATE_PREV', payload: { [e.target.name]: parseFloat(e.target.value) || 0 } });
@@ -27,32 +29,87 @@ const Preventivo = () => {
 
   const updateCat = (id, field, val) => {
     const value = parseFloat(val) || 0;
-    setCategorie(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
+    const nuove = categorie.map(c => c.id === id ? { ...c, [field]: value } : c);
+    saveCategorie(nuove);
   };
 
-  // FUNZIONE AGGIUNGI CORRETTA
   const addCat = () => {
     if (!newNome.trim()) return;
-    
-    const nuovaCategoria = { 
-      id: Date.now(), 
-      nome: newNome.trim(), 
-      budget: 0, 
-      consuntivo: 0 
-    };
-    
-    setCategorie([...categorie, nuovaCategoria]);
+    const nuove = [...categorie, { id: Date.now(), nome: newNome.trim(), budget: 0, consuntivo: 0 }];
+    saveCategorie(nuove);
     setNewNome('');
   };
 
-  const removeCat = (id) => setCategorie(prev => prev.filter(c => c.id !== id));
+  const removeCat = (id) => {
+    saveCategorie(categorie.filter(c => c.id !== id));
+  };
 
-  const totalBudget = categorie.reduce((a, c) => a + c.budget, 0);
+  const totalBudget     = categorie.reduce((a, c) => a + c.budget, 0);
   const totalConsuntivo = categorie.reduce((a, c) => a + c.consuntivo, 0);
+  const scostamento     = consuntivo - budget;
+  const percentuale     = budget !== 0 ? ((scostamento / budget) * 100).toFixed(1) : 0;
+  const isPositive      = scostamento >= 0;
 
-  const scostamento = consuntivo - budget;
-  const percentuale = budget !== 0 ? ((scostamento / budget) * 100).toFixed(1) : 0;
-  const isPositive = scostamento >= 0;
+  const chartData = {
+    labels: categorie.map(c => c.nome),
+    datasets: [
+      {
+        label: 'Budget',
+        data: categorie.map(c => c.budget),
+        backgroundColor: 'rgba(79,142,247,0.7)',
+        borderRadius: 6,
+        borderSkipped: false,
+      },
+      {
+        label: 'Consuntivo',
+        data: categorie.map(c => c.consuntivo),
+        backgroundColor: 'rgba(15,212,148,0.7)',
+        borderRadius: 6,
+        borderSkipped: false,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#8899bb',
+          font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' },
+          boxWidth: 12,
+          borderRadius: 4,
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(11,15,26,0.95)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleColor: '#f0f4ff',
+        bodyColor: '#8899bb',
+        callbacks: {
+          label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString('it-IT')} €`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: { color: '#6a7a9b', font: { family: 'Plus Jakarta Sans', size: 11 } },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+      },
+      y: {
+        ticks: {
+          color: '#6a7a9b',
+          font: { family: 'JetBrains Mono', size: 11 },
+          callback: (v) => v.toLocaleString('it-IT') + ' €',
+        },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+      },
+    },
+  };
+
+  const hasChartData = categorie.some(c => c.budget > 0 || c.consuntivo > 0);
 
   return (
     <div className="page-wrapper">
@@ -73,23 +130,41 @@ const Preventivo = () => {
           </h3>
           <div className="field">
             <label>Budget Previsionale (€)</label>
-            <input type="number" name="budget" value={budget || ''} placeholder="0" onChange={handleGlobalChange} />
+            <input
+              type="number"
+              name="budget"
+              value={budget || ''}
+              placeholder="0"
+              onChange={handleGlobalChange}
+            />
           </div>
           <div className="field">
             <label>Consuntivo Reale (€)</label>
-            <input type="number" name="consuntivo" value={consuntivo || ''} placeholder="0" onChange={handleGlobalChange} />
+            <input
+              type="number"
+              name="consuntivo"
+              value={consuntivo || ''}
+              placeholder="0"
+              onChange={handleGlobalChange}
+            />
           </div>
         </div>
 
-        <div className="card animate-in" style={{
-          border: `1px solid ${isPositive ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
-          background: isPositive ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)',
-        }}>
+        <div
+          className="card animate-in"
+          style={{
+            border: `1px solid ${isPositive ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
+            background: isPositive ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)',
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>
               Analisi Scostamento
             </span>
-            {isPositive ? <CheckCircle2 size={22} color="var(--success)" /> : <AlertCircle size={22} color="var(--danger)" />}
+            {isPositive
+              ? <CheckCircle2 size={22} color="var(--success)" />
+              : <AlertCircle size={22} color="var(--danger)" />
+            }
           </div>
           <div style={{
             fontSize: '2.5rem', fontFamily: 'var(--mono)', fontWeight: 800,
@@ -98,35 +173,51 @@ const Preventivo = () => {
             {isPositive ? '+' : ''}{scostamento.toLocaleString('it-IT')} €
           </div>
           <div style={{ fontWeight: 600, fontSize: '1rem', color: isPositive ? 'var(--success)' : 'var(--danger)', marginBottom: '0.5rem' }}>
-            {isPositive ? <TrendingUp size={16} style={{ display: 'inline' }}/> : <TrendingDown size={16} style={{ display: 'inline' }}/>}
-            {' '}{percentuale}% rispetto al budget
+            {isPositive
+              ? <TrendingUp size={16} style={{ display: 'inline', marginRight: 4 }} />
+              : <TrendingDown size={16} style={{ display: 'inline', marginRight: 4 }} />
+            }
+            {percentuale}% rispetto al budget
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            {isPositive ? '✓ Performance superiore alle aspettative.' : '⚠ Performance inferiore al budget prefissato.'}
+            {isPositive
+              ? '✓ Performance superiore alle aspettative.'
+              : '⚠ Performance inferiore al budget prefissato.'
+            }
           </p>
         </div>
       </div>
 
-      <div className="card animate-in">
+      <div className="card animate-in" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: 12 }}>
           <h3 style={{ color: 'var(--text-bright)', margin: 0, fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             📋 Budget per Categoria
           </h3>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
-              type="text" value={newNome}
+              type="text"
+              value={newNome}
               onChange={e => setNewNome(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addCat()}
               placeholder="Nuova categoria..."
               style={{
-                background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)',
-                borderRadius: 8, padding: '0.45rem 0.8rem',
-                color: 'var(--text-bright)', fontSize: '0.82rem',
-                fontFamily: 'var(--font)', outline: 'none', minWidth: 180,
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '0.45rem 0.8rem',
+                color: 'var(--text-bright)',
+                fontSize: '0.82rem',
+                fontFamily: 'var(--font)',
+                outline: 'none',
+                minWidth: 180,
               }}
             />
-            <button className="btn btn-primary" onClick={addCat} style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}>
-              <Plus size={14}/> Aggiungi
+            <button
+              className="btn btn-primary"
+              onClick={addCat}
+              style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
+            >
+              <Plus size={14} /> Aggiungi
             </button>
           </div>
         </div>
@@ -136,8 +227,18 @@ const Preventivo = () => {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['Categoria', 'Budget (€)', 'Consuntivo (€)', 'Scostamento', '%', ''].map(h => (
-                  <th key={h} style={{ padding: '0.6rem 0.8rem', textAlign: h === 'Categoria' ? 'left' : 'right',
-                    color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  <th
+                    key={h}
+                    style={{
+                      padding: '0.6rem 0.8rem',
+                      textAlign: h === 'Categoria' ? 'left' : 'right',
+                      color: 'var(--text-muted)',
+                      fontWeight: 700,
+                      fontSize: '0.7rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                    }}
+                  >
                     {h}
                   </th>
                 ))}
@@ -145,41 +246,83 @@ const Preventivo = () => {
             </thead>
             <tbody>
               {categorie.map(cat => {
-                const sc = cat.consuntivo - cat.budget;
+                const sc  = cat.consuntivo - cat.budget;
                 const pct = cat.budget !== 0 ? ((sc / cat.budget) * 100).toFixed(1) : '—';
                 const pos = sc >= 0;
                 return (
-                  <tr key={cat.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.15s' }}
+                  <tr
+                    key={cat.id}
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
-                    <td style={{ padding: '0.55rem 0.8rem', color: 'var(--text-bright)', fontWeight: 500 }}>{cat.nome}</td>
+                    <td style={{ padding: '0.55rem 0.8rem', color: 'var(--text-bright)', fontWeight: 500 }}>
+                      {cat.nome}
+                    </td>
                     <td style={{ padding: '0.55rem 0.8rem', textAlign: 'right' }}>
-                      <input type="number" value={cat.budget || ''} placeholder="0"
+                      <input
+                        type="number"
+                        value={cat.budget || ''}
+                        placeholder="0"
                         onChange={e => updateCat(cat.id, 'budget', e.target.value)}
-                        style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: 6,
-                          padding: '0.3rem 0.6rem', color: 'var(--text-bright)', fontFamily: 'var(--mono)',
-                          fontSize: '0.82rem', width: 110, textAlign: 'right', outline: 'none' }} />
+                        style={{
+                          background: 'rgba(0,0,0,0.3)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 6,
+                          padding: '0.3rem 0.6rem',
+                          color: 'var(--text-bright)',
+                          fontFamily: 'var(--mono)',
+                          fontSize: '0.82rem',
+                          width: 110,
+                          textAlign: 'right',
+                          outline: 'none',
+                        }}
+                      />
                     </td>
                     <td style={{ padding: '0.55rem 0.8rem', textAlign: 'right' }}>
-                      <input type="number" value={cat.consuntivo || ''} placeholder="0"
+                      <input
+                        type="number"
+                        value={cat.consuntivo || ''}
+                        placeholder="0"
                         onChange={e => updateCat(cat.id, 'consuntivo', e.target.value)}
-                        style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: 6,
-                          padding: '0.3rem 0.6rem', color: 'var(--text-bright)', fontFamily: 'var(--mono)',
-                          fontSize: '0.82rem', width: 110, textAlign: 'right', outline: 'none' }} />
+                        style={{
+                          background: 'rgba(0,0,0,0.3)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 6,
+                          padding: '0.3rem 0.6rem',
+                          color: 'var(--text-bright)',
+                          fontFamily: 'var(--mono)',
+                          fontSize: '0.82rem',
+                          width: 110,
+                          textAlign: 'right',
+                          outline: 'none',
+                        }}
+                      />
                     </td>
-                    <td style={{ padding: '0.55rem 0.8rem', textAlign: 'right', fontFamily: 'var(--mono)',
-                      fontWeight: 700, color: pos ? 'var(--success)' : 'var(--danger)' }}>
+                    <td style={{
+                      padding: '0.55rem 0.8rem',
+                      textAlign: 'right',
+                      fontFamily: 'var(--mono)',
+                      fontWeight: 700,
+                      color: pos ? 'var(--success)' : 'var(--danger)',
+                    }}>
                       {pos ? '+' : ''}{sc.toLocaleString('it-IT')} €
                     </td>
-                    <td style={{ padding: '0.55rem 0.8rem', textAlign: 'right', fontFamily: 'var(--mono)',
-                      color: pos ? 'var(--success)' : 'var(--danger)', fontSize: '0.8rem' }}>
+                    <td style={{
+                      padding: '0.55rem 0.8rem',
+                      textAlign: 'right',
+                      fontFamily: 'var(--mono)',
+                      color: pos ? 'var(--success)' : 'var(--danger)',
+                      fontSize: '0.8rem',
+                    }}>
                       {pct !== '—' ? `${pct}%` : '—'}
                     </td>
                     <td style={{ padding: '0.55rem 0.5rem', textAlign: 'right' }}>
-                      <button onClick={() => removeCat(cat.id)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
-                        <Trash2 size={13}/>
+                      <button
+                        onClick={() => removeCat(cat.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}
+                      >
+                        <Trash2 size={13} />
                       </button>
                     </td>
                   </tr>
@@ -195,8 +338,13 @@ const Preventivo = () => {
                 <td style={{ padding: '0.7rem 0.8rem', textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--primary)' }}>
                   {fmt(totalConsuntivo)}
                 </td>
-                <td style={{ padding: '0.7rem 0.8rem', textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700,
-                  color: (totalConsuntivo - totalBudget) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                <td style={{
+                  padding: '0.7rem 0.8rem',
+                  textAlign: 'right',
+                  fontFamily: 'var(--mono)',
+                  fontWeight: 700,
+                  color: (totalConsuntivo - totalBudget) >= 0 ? 'var(--success)' : 'var(--danger)',
+                }}>
                   {(totalConsuntivo - totalBudget) >= 0 ? '+' : ''}{(totalConsuntivo - totalBudget).toLocaleString('it-IT')} €
                 </td>
                 <td colSpan={2} />
@@ -205,6 +353,17 @@ const Preventivo = () => {
           </table>
         </div>
       </div>
+
+      {hasChartData && (
+        <div className="card animate-in">
+          <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            📊 Grafico Budget vs Consuntivo
+          </h3>
+          <div style={{ height: 300 }}>
+            <Bar data={chartData} options={chartOptions} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

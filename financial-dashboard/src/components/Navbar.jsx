@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, TrendingUp, Scale, Target, FileText, Menu, X } from 'lucide-react';
+import { BarChart3, TrendingUp, Scale, Target, FileText, History, Menu, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const links = [
@@ -8,6 +8,7 @@ const links = [
   { to: '/stato-patrimoniale', label: 'Stato Patrimoniale', icon: <Scale size={15}/> },
   { to: '/preventivo',         label: 'Preventivo',         icon: <Target size={15}/> },
   { to: '/report',             label: 'Report',             icon: <FileText size={15}/> },
+  { to: '/storico/2025-26',    label: 'Storico',            icon: <History size={15}/> },
 ];
 
 const navStyle = `
@@ -140,7 +141,7 @@ const navStyle = `
     font-weight: 600;
     transition: background 0.15s;
   }
-  @media (max-width: 800px) {
+  @media (max-width: 900px) {
     .nav-links     { display: none !important; }
     .nav-hamburger { display: flex !important; }
   }
@@ -148,7 +149,7 @@ const navStyle = `
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]       = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -156,6 +157,12 @@ const Navbar = () => {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const isActive = (to) => {
+    if (to === '/') return pathname === '/';
+    if (to.startsWith('/storico')) return pathname.startsWith('/storico');
+    return pathname === to;
+  };
 
   return (
     <nav className={`nav-root${scrolled ? ' scrolled' : ''}`}>
@@ -174,7 +181,7 @@ const Navbar = () => {
             <Link
               key={to}
               to={to}
-              className={`nav-link ${pathname === to ? 'active' : 'inactive'}`}
+              className={`nav-link ${isActive(to) ? 'active' : 'inactive'}`}
             >
               {icon} {label}
             </Link>
@@ -186,7 +193,7 @@ const Navbar = () => {
         </button>
       </div>
 
-      <div className="nav-mobile-menu" style={{ maxHeight: open ? 400 : 0 }}>
+      <div className="nav-mobile-menu" style={{ maxHeight: open ? 500 : 0 }}>
         {links.map(({ to, label, icon }) => (
           <Link
             key={to}
@@ -194,9 +201,9 @@ const Navbar = () => {
             className="nav-mobile-link"
             onClick={() => setOpen(false)}
             style={{
-              color: pathname === to ? '#4f8ef7' : '#6a7a9b',
-              background: pathname === to ? 'rgba(79,142,247,0.08)' : 'transparent',
-              borderLeft: pathname === to ? '3px solid #4f8ef7' : '3px solid transparent',
+              color:      isActive(to) ? '#4f8ef7' : '#6a7a9b',
+              background: isActive(to) ? 'rgba(79,142,247,0.08)' : 'transparent',
+              borderLeft: isActive(to) ? '3px solid #4f8ef7' : '3px solid transparent',
             }}
           >
             {icon} {label}

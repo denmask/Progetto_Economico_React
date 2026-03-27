@@ -1,7 +1,7 @@
 import React, { useContext, useState } from 'react';
 import FinancialContext from '../context/FinancialContext';
 import { ANNI } from '../context/FinancialContext';
-import { Download, FileText, TrendingUp, Scale, Target, AlertTriangle, BarChart2, LineChart } from 'lucide-react';
+import { Download, FileText, TrendingUp, Scale, Target, AlertTriangle, BarChart2, LineChart, FileSpreadsheet } from 'lucide-react';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -10,12 +10,13 @@ import {
 import { Bar, Line } from 'react-chartjs-2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler);
 
-const sum  = (...args) => args.reduce((a, b) => a + (b || 0), 0);
-const fmt  = (n) => (n || 0).toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
-const fmtK = (n) => {
+const sum   = (...args) => args.reduce((a, b) => a + (b || 0), 0);
+const fmt   = (n) => (n || 0).toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
+const fmtK  = (n) => {
   const v = n || 0;
   if (Math.abs(v) >= 1000000) return (v / 1000000).toFixed(1) + 'M';
   if (Math.abs(v) >= 1000)    return (v / 1000).toFixed(0) + 'K';
@@ -37,18 +38,18 @@ const Row = ({ label, value, color, bold }) => (
 );
 
 const computeCE = (ce) => {
-  const totaleA       = sum(ce.ricaviVendite, ce.variazioneProdotti, ce.variazioneWIP, ce.incrementoImmobilizzazioni, ce.altriRicavi, ce.contributiConto, ce.plusvalenzeAlienazioni, ce.canoniLocazione, ce.interessiAttivi, ce.dividendi, ce.proventiFinanziari);
-  const costiAcquisti = sum(ce.acquistiMerci, ce.acquistMateriePrime, ce.variazioneRimanenzeMerci);
-  const costiServizi  = sum(ce.serviziEsterniAmm, ce.utenzeTel, ce.consulenze, ce.assicurazioni, ce.manutRiparazioni, ce.serviziMarketing);
-  const costiGodimento= sum(ce.godimentoBeniTerzi, ce.fittiBeni, ce.leasing);
-  const costiPersonale= sum(ce.salariStipendi, ce.oneriSociali, ce.tfr, ce.altriCostPersonale);
-  const ammortamenti  = sum(ce.ammortImmMateriali, ce.ammortImmImmateriali, ce.svalutazioniCrediti, ce.altriAccantonamenti);
-  const totaleB       = sum(costiAcquisti, costiServizi, costiGodimento, costiPersonale, ammortamenti, ce.oneriDiversiGestione);
-  const ebitda        = totaleA - sum(costiAcquisti, costiServizi, costiGodimento, costiPersonale, ce.oneriDiversiGestione);
-  const ebit          = ebitda - ammortamenti;
+  const totaleA        = sum(ce.ricaviVendite, ce.variazioneProdotti, ce.variazioneWIP, ce.incrementoImmobilizzazioni, ce.altriRicavi, ce.contributiConto, ce.plusvalenzeAlienazioni, ce.canoniLocazione, ce.interessiAttivi, ce.dividendi, ce.proventiFinanziari);
+  const costiAcquisti  = sum(ce.acquistiMerci, ce.acquistMateriePrime, ce.variazioneRimanenzeMerci);
+  const costiServizi   = sum(ce.serviziEsterniAmm, ce.utenzeTel, ce.consulenze, ce.assicurazioni, ce.manutRiparazioni, ce.serviziMarketing);
+  const costiGodimento = sum(ce.godimentoBeniTerzi, ce.fittiBeni, ce.leasing);
+  const costiPersonale = sum(ce.salariStipendi, ce.oneriSociali, ce.tfr, ce.altriCostPersonale);
+  const ammortamenti   = sum(ce.ammortImmMateriali, ce.ammortImmImmateriali, ce.svalutazioniCrediti, ce.altriAccantonamenti);
+  const totaleB        = sum(costiAcquisti, costiServizi, costiGodimento, costiPersonale, ammortamenti, ce.oneriDiversiGestione);
+  const ebitda         = totaleA - sum(costiAcquisti, costiServizi, costiGodimento, costiPersonale, ce.oneriDiversiGestione);
+  const ebit           = ebitda - ammortamenti;
   const oneriFinanziari = sum(ce.oneriInteressi, ce.oneriMutui, ce.oneriLeasing, ce.perditeValori);
-  const totaleImposte = sum(ce.irap, ce.ires, ce.altreImposte);
-  const utile         = ebit - oneriFinanziari - totaleImposte;
+  const totaleImposte  = sum(ce.irap, ce.ires, ce.altreImposte);
+  const utile          = ebit - oneriFinanziari - totaleImposte;
   return { totaleA, totaleB, ebitda, ebit, oneriFinanziari, totaleImposte, utile, costiAcquisti, costiServizi, costiGodimento, costiPersonale, ammortamenti };
 };
 
@@ -142,17 +143,6 @@ const Report = () => {
 
   const hasAnyData     = datiStorici.some(d => d.ce.totaleA > 0 || d.sp.totaleAttivo > 0);
   const hasCurrentData = ceData.totaleA > 0 || spData.totaleAttivo > 0;
-
-  const buildBarData = (metriche) => ({
-    labels: metriche.map(m => m.label),
-    datasets: ANNI.map(anno => ({
-      label: anno,
-      data: metriche.map(m => datiStorici.find(d => d.anno === anno)[anno.includes('ce') ? 'ce' : 'ce'][m.key]),
-      backgroundColor: CHART_COLORS[anno].bar,
-      borderColor: CHART_COLORS[anno].border,
-      borderWidth: 1, borderRadius: 5,
-    })),
-  });
 
   const barDataCE = {
     labels: METRICHE_CE.map(m => m.label),
@@ -296,22 +286,20 @@ const Report = () => {
 
       if (hasCE) {
         sectionTitle('Conto Economico — Art. 2425 c.c.', [20, 60, 160]);
-
         const ceRows = [
-          ['A — Valore della Produzione',   fmtPDF(d.ce.totaleA),        true],
-          ['  di cui: Ricavi Vendite',       fmtPDF(anni[anno].contoEconomico.ricaviVendite || 0), false],
-          ['B — Costi della Produzione',    fmtPDF(d.ce.totaleB),        true],
-          ['  di cui: Acquisti',            fmtPDF(d.ce.costiAcquisti),  false],
-          ['  di cui: Servizi Esterni',     fmtPDF(d.ce.costiServizi),   false],
-          ['  di cui: Personale',           fmtPDF(d.ce.costiPersonale), false],
-          ['  di cui: Ammortamenti',        fmtPDF(d.ce.ammortamenti),   false],
-          ['EBITDA',                        fmtPDF(d.ce.ebitda),         true],
-          ['EBIT (Risultato Operativo)',    fmtPDF(d.ce.ebit),           true],
-          ['C — Oneri Finanziari',          fmtPDF(d.ce.oneriFinanziari),false],
-          ["E — Imposte d'Esercizio",       fmtPDF(d.ce.totaleImposte),  false],
-          ["Utile / Perdita d'Esercizio",   fmtPDF(d.ce.utile),          true],
+          ['A — Valore della Produzione',  fmtPDF(d.ce.totaleA),        true],
+          ['  di cui: Ricavi Vendite',      fmtPDF(anni[anno].contoEconomico.ricaviVendite || 0), false],
+          ['B — Costi della Produzione',   fmtPDF(d.ce.totaleB),        true],
+          ['  di cui: Acquisti',           fmtPDF(d.ce.costiAcquisti),  false],
+          ['  di cui: Servizi Esterni',    fmtPDF(d.ce.costiServizi),   false],
+          ['  di cui: Personale',          fmtPDF(d.ce.costiPersonale), false],
+          ['  di cui: Ammortamenti',       fmtPDF(d.ce.ammortamenti),   false],
+          ['EBITDA',                       fmtPDF(d.ce.ebitda),         true],
+          ['EBIT (Risultato Operativo)',   fmtPDF(d.ce.ebit),           true],
+          ['C — Oneri Finanziari',         fmtPDF(d.ce.oneriFinanziari),false],
+          ["E — Imposte d'Esercizio",      fmtPDF(d.ce.totaleImposte),  false],
+          ["Utile / Perdita d'Esercizio",  fmtPDF(d.ce.utile),          true],
         ];
-
         autoTable(doc, {
           startY: y,
           head: [['Voce', 'Importo']],
@@ -324,8 +312,8 @@ const Report = () => {
           didParseCell: (data) => {
             if (data.section === 'body') {
               if (ceRows[data.row.index][2]) {
-                data.cell.styles.fontStyle  = 'bold';
-                data.cell.styles.fillColor  = [240, 245, 255];
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fillColor = [240, 245, 255];
               }
               if (data.column.index === 1) {
                 const vals = [d.ce.totaleA, anni[anno].contoEconomico.ricaviVendite, d.ce.totaleB,
@@ -342,7 +330,6 @@ const Report = () => {
       if (hasSP) {
         checkY(20);
         sectionTitle('Stato Patrimoniale — Art. 2424 c.c.', [20, 100, 80]);
-
         const spRows = [
           ['ATTIVO', '', true],
           ['Immobilizzazioni (nette)', fmtPDF(d.sp.totaleImmobilizzato), false],
@@ -355,12 +342,10 @@ const Report = () => {
           ['Fondi e TFR',              fmtPDF(d.sp.fondi),               false],
           ['TOTALE PASSIVO + NETTO',   fmtPDF(d.sp.totaleFonti),         true],
         ];
-
         const solidita = d.sp.totaleFonti > 0 ? ((d.sp.patrimonioNetto / d.sp.totaleFonti) * 100).toFixed(1) + '%' : '—';
         const leva     = (d.sp.debitiBreve + d.sp.debitiLungo) > 0 && d.sp.patrimonioNetto > 0
           ? ((d.sp.debitiBreve + d.sp.debitiLungo) / d.sp.patrimonioNetto).toFixed(2) + 'x'
           : '—';
-
         autoTable(doc, {
           startY: y,
           head: [['Voce', 'Importo']],
@@ -372,13 +357,12 @@ const Report = () => {
           alternateRowStyles: { fillColor: [248, 253, 250] },
           didParseCell: (data) => {
             if (data.section === 'body' && (spRows[data.row.index][2] || spRows[data.row.index][1] === '')) {
-              data.cell.styles.fontStyle  = 'bold';
-              data.cell.styles.fillColor  = [225, 245, 232];
-              data.cell.styles.textColor  = [20, 80, 50];
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [225, 245, 232];
+              data.cell.styles.textColor = [20, 80, 50];
             }
           },
         });
-
         y = doc.lastAutoTable.finalY + 4;
         checkY(8);
         doc.setFont('helvetica', 'italic');
@@ -408,6 +392,66 @@ const Report = () => {
     doc.save(`Report_Finanziario_${ANNI[0]}_${ANNI[ANNI.length - 1]}.pdf`);
   };
 
+  const exportExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    const kpiRows = [
+      ['Metrica', ...ANNI],
+      ['Valore della Produzione', ...datiStorici.map(d => d.ce.totaleA)],
+      ['EBITDA',                  ...datiStorici.map(d => d.ce.ebitda)],
+      ['EBIT',                    ...datiStorici.map(d => d.ce.ebit)],
+      ["Utile d'Esercizio",       ...datiStorici.map(d => d.ce.utile)],
+      ['Totale Attivo',           ...datiStorici.map(d => d.sp.totaleAttivo)],
+      ['Patrimonio Netto',        ...datiStorici.map(d => d.sp.patrimonioNetto)],
+      ['Debiti a Breve',          ...datiStorici.map(d => d.sp.debitiBreve)],
+      ['Debiti a Lungo',          ...datiStorici.map(d => d.sp.debitiLungo)],
+    ];
+    const wsKpi = XLSX.utils.aoa_to_sheet(kpiRows);
+    wsKpi['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, wsKpi, 'KPI Storico');
+
+    ANNI.forEach(anno => {
+      const d  = datiStorici.find(x => x.anno === anno);
+      const ce = anni[anno].contoEconomico;
+
+      const ceRows = [
+        ['CONTO ECONOMICO — ' + anno, ''],
+        ['Voce', 'Importo (€)'],
+        ['A — Valore della Produzione',  d.ce.totaleA],
+        ['  Ricavi Vendite',             ce.ricaviVendite || 0],
+        ['  Variazione Prodotti',        ce.variazioneProdotti || 0],
+        ['  Altri Ricavi',               ce.altriRicavi || 0],
+        ['B — Costi della Produzione',   d.ce.totaleB],
+        ['  Acquisti',                   d.ce.costiAcquisti],
+        ['  Servizi Esterni',            d.ce.costiServizi],
+        ['  Personale',                  d.ce.costiPersonale],
+        ['  Ammortamenti',               d.ce.ammortamenti],
+        ['EBITDA',                       d.ce.ebitda],
+        ['EBIT',                         d.ce.ebit],
+        ['Oneri Finanziari',             d.ce.oneriFinanziari],
+        ["Imposte d'Esercizio",          d.ce.totaleImposte],
+        ["Utile / Perdita d'Esercizio",  d.ce.utile],
+        [''],
+        ['STATO PATRIMONIALE — ' + anno, ''],
+        ['Voce', 'Importo (€)'],
+        ['Immobilizzazioni',    d.sp.totaleImmobilizzato],
+        ['Attivo Circolante',   d.sp.totaleCircolante],
+        ['TOTALE ATTIVO',       d.sp.totaleAttivo],
+        ['Patrimonio Netto',    d.sp.patrimonioNetto],
+        ['Debiti a Breve',      d.sp.debitiBreve],
+        ['Debiti a Lungo',      d.sp.debitiLungo],
+        ['Fondi e TFR',         d.sp.fondi],
+        ['TOTALE FONTI',        d.sp.totaleFonti],
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(ceRows);
+      ws['!cols'] = [{ wch: 32 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, ws, anno);
+    });
+
+    XLSX.writeFile(wb, `Report_Finanziario_${ANNI[0]}_${ANNI[ANNI.length - 1]}.xlsx`);
+  };
+
   const tabStyle = (active) => ({
     display: 'inline-flex', alignItems: 'center', gap: 6,
     padding: '0.38rem 0.9rem', borderRadius: 'var(--radius-xs)',
@@ -430,9 +474,52 @@ const Report = () => {
             </h1>
             <p style={{ marginTop: 6 }}>Riepilogo consolidato e confronto storico 2022–2026</p>
           </div>
-          <button className="btn btn-primary" onClick={exportPDF} disabled={!hasAnyData} style={{ opacity: hasAnyData ? 1 : 0.4 }}>
-            <Download size={16}/> Esporta PDF
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary"
+              onClick={exportPDF}
+              disabled={!hasAnyData}
+              style={{ opacity: hasAnyData ? 1 : 0.4 }}
+            >
+              <Download size={16} /> Esporta PDF
+            </button>
+            <button
+              onClick={exportExcel}
+              disabled={!hasAnyData}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '0.65rem 1.4rem',
+                borderRadius: 'var(--radius-sm)',
+                fontFamily: 'var(--font)',
+                fontSize: '0.88rem',
+                fontWeight: 700,
+                cursor: hasAnyData ? 'pointer' : 'not-allowed',
+                border: '1px solid #1a6b35',
+                background: 'linear-gradient(135deg, #1d7a3d, #166530)',
+                color: '#ffffff',
+                boxShadow: hasAnyData ? '0 0 18px rgba(29,122,61,0.4), 0 4px 14px rgba(0,0,0,0.4)' : 'none',
+                opacity: hasAnyData ? 1 : 0.4,
+                transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+              onMouseEnter={e => {
+                if (!hasAnyData) return;
+                e.currentTarget.style.background = 'linear-gradient(135deg, #22913f, #1d7a3d)';
+                e.currentTarget.style.boxShadow  = '0 0 30px rgba(29,122,61,0.6), 0 6px 20px rgba(0,0,0,0.5)';
+                e.currentTarget.style.transform  = 'translateY(-2px) scale(1.01)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #1d7a3d, #166530)';
+                e.currentTarget.style.boxShadow  = '0 0 18px rgba(29,122,61,0.4), 0 4px 14px rgba(0,0,0,0.4)';
+                e.currentTarget.style.transform  = 'translateY(0) scale(1)';
+              }}
+            >
+              <FileSpreadsheet size={16} /> Esporta Excel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -449,7 +536,7 @@ const Report = () => {
           <div className="card animate-in" style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '2.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
               <div style={{ width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(59,130,246,0.4)' }}>
-                <FileText size={28} color="#fff"/>
+                <FileText size={28} color="#fff" />
               </div>
             </div>
             <h2 style={{ color: 'var(--text-bright)', marginBottom: '0.4rem', fontSize: '1.5rem', fontWeight: 800 }}>Prospetto Finanziario</h2>
@@ -464,26 +551,26 @@ const Report = () => {
                 📈 Confronto Storico — {ANNI[0]} / {ANNI[ANNI.length - 1]}
               </h3>
               <div style={{ display: 'flex', gap: 4, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: 8, padding: 3 }}>
-                <button style={tabStyle(chartView === 'bar')}  onClick={() => setChartView('bar')}>  <BarChart2  size={13}/> Barre</button>
-                <button style={tabStyle(chartView === 'line')} onClick={() => setChartView('line')}> <LineChart  size={13}/> Linee</button>
+                <button style={tabStyle(chartView === 'bar')}  onClick={() => setChartView('bar')}>  <BarChart2  size={13} /> Barre</button>
+                <button style={tabStyle(chartView === 'line')} onClick={() => setChartView('line')}> <LineChart  size={13} /> Linee</button>
               </div>
             </div>
 
             <div className="grid-2" style={{ gap: '1.2rem' }}>
               <div className="storico-chart-wrap">
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  <TrendingUp size={13} style={{ display: 'inline', marginRight: 5, color: 'var(--primary)' }}/>Conto Economico
+                  <TrendingUp size={13} style={{ display: 'inline', marginRight: 5, color: 'var(--primary)' }} />Conto Economico
                 </div>
                 <div style={{ height: 260 }}>
-                  {chartView === 'bar' ? <Bar  data={barDataCE}  options={chartOptions} /> : <Line data={lineDataCE} options={chartOptions} />}
+                  {chartView === 'bar' ? <Bar data={barDataCE} options={chartOptions} /> : <Line data={lineDataCE} options={chartOptions} />}
                 </div>
               </div>
               <div className="storico-chart-wrap">
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  <Scale size={13} style={{ display: 'inline', marginRight: 5, color: 'var(--accent)' }}/>Stato Patrimoniale
+                  <Scale size={13} style={{ display: 'inline', marginRight: 5, color: 'var(--accent)' }} />Stato Patrimoniale
                 </div>
                 <div style={{ height: 260 }}>
-                  {chartView === 'bar' ? <Bar  data={barDataSP}  options={chartOptions} /> : <Line data={lineDataSP} options={chartOptions} />}
+                  {chartView === 'bar' ? <Bar data={barDataSP} options={chartOptions} /> : <Line data={lineDataSP} options={chartOptions} />}
                 </div>
               </div>
             </div>
@@ -503,14 +590,15 @@ const Report = () => {
                 </thead>
                 <tbody>
                   {[
-                    { label: 'Valore Produzione', fn: d => d.ce.totaleA,          color: 'var(--primary)' },
-                    { label: 'EBITDA',             fn: d => d.ce.ebitda,           color: 'var(--success)' },
-                    { label: 'EBIT',               fn: d => d.ce.ebit,             color: 'var(--accent)'  },
-                    { label: "Utile d'Esercizio",  fn: d => d.ce.utile,            color: 'var(--purple)'  },
-                    { label: 'Totale Attivo',      fn: d => d.sp.totaleAttivo,     color: 'var(--primary)' },
-                    { label: 'Patrimonio Netto',   fn: d => d.sp.patrimonioNetto,  color: 'var(--success)' },
+                    { label: 'Valore Produzione', fn: d => d.ce.totaleA,         color: 'var(--primary)' },
+                    { label: 'EBITDA',             fn: d => d.ce.ebitda,          color: 'var(--success)' },
+                    { label: 'EBIT',               fn: d => d.ce.ebit,            color: 'var(--accent)'  },
+                    { label: "Utile d'Esercizio",  fn: d => d.ce.utile,           color: 'var(--purple)'  },
+                    { label: 'Totale Attivo',      fn: d => d.sp.totaleAttivo,    color: 'var(--primary)' },
+                    { label: 'Patrimonio Netto',   fn: d => d.sp.patrimonioNetto, color: 'var(--success)' },
                   ].map(({ label, fn, color }) => (
-                    <tr key={label}
+                    <tr
+                      key={label}
                       style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -534,11 +622,11 @@ const Report = () => {
           {hasCurrentData && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2rem 0 1rem' }}>
-                <div style={{ flex: 1, height: 1, background: 'var(--border)' }}/>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                 <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                   Dettaglio Esercizio {state.annoSelezionato}
                 </span>
-                <div style={{ flex: 1, height: 1, background: 'var(--border)' }}/>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
               </div>
 
               <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
@@ -547,13 +635,13 @@ const Report = () => {
                     <TrendingUp size={18} color="var(--primary)" />
                     <h3 style={{ color: 'var(--text-bright)', margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Conto Economico</h3>
                   </div>
-                  <Row label="Valore della Produzione"    value={ceData.totaleA} />
-                  <Row label="Totale Costi Operativi"     value={ceData.totaleB} />
-                  <Row label="EBITDA"                     value={ceData.ebitda}         color={ceData.ebitda >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
-                  <Row label="EBIT (Risultato Operativo)" value={ceData.ebit}           color={ceData.ebit   >= 0 ? 'var(--accent)'  : 'var(--danger)'} />
-                  <Row label="Oneri Finanziari"           value={ceData.oneriFinanziari} color="var(--warning)" />
-                  <Row label="Imposte"                    value={ceData.totaleImposte}   color="var(--danger)" />
-                  <Row label="Utile / Perdita d'Esercizio" value={ceData.utile}         color={ceData.utile  >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
+                  <Row label="Valore della Produzione"     value={ceData.totaleA} />
+                  <Row label="Totale Costi Operativi"      value={ceData.totaleB} />
+                  <Row label="EBITDA"                      value={ceData.ebitda}          color={ceData.ebitda >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
+                  <Row label="EBIT (Risultato Operativo)"  value={ceData.ebit}            color={ceData.ebit   >= 0 ? 'var(--accent)'  : 'var(--danger)'} />
+                  <Row label="Oneri Finanziari"            value={ceData.oneriFinanziari}  color="var(--warning)" />
+                  <Row label="Imposte"                     value={ceData.totaleImposte}    color="var(--danger)" />
+                  <Row label="Utile / Perdita d'Esercizio" value={ceData.utile}            color={ceData.utile  >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
                   {ceData.totaleA > 0 && (
                     <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                       ROS: {((ceData.utile / ceData.totaleA) * 100).toFixed(1)}% | Margine EBITDA: {((ceData.ebitda / ceData.totaleA) * 100).toFixed(1)}%
@@ -568,13 +656,13 @@ const Report = () => {
                   </div>
                   <Row label="Immobilizzazioni"  value={spData.totaleImmobilizzato} />
                   <Row label="Attivo Circolante"  value={spData.totaleCircolante} />
-                  <Row label="Totale Attivo"      value={spData.totaleAttivo}      bold />
+                  <Row label="Totale Attivo"      value={spData.totaleAttivo}       bold />
                   <div style={{ height: 1, background: 'var(--border)', margin: '0.75rem 0' }} />
-                  <Row label="Patrimonio Netto"   value={spData.patrimonioNetto}   color={spData.patrimonioNetto >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
-                  <Row label="Debiti a Breve"     value={spData.debitiBreve}       color="var(--danger)" />
-                  <Row label="Debiti a Lungo"     value={spData.debitiLungo}       color="var(--warning)" />
+                  <Row label="Patrimonio Netto"   value={spData.patrimonioNetto}    color={spData.patrimonioNetto >= 0 ? 'var(--success)' : 'var(--danger)'} bold />
+                  <Row label="Debiti a Breve"     value={spData.debitiBreve}        color="var(--danger)" />
+                  <Row label="Debiti a Lungo"     value={spData.debitiLungo}        color="var(--warning)" />
                   <Row label="Fondi e TFR"        value={spData.fondi} />
-                  <Row label="Totale Fonti"       value={spData.totaleFonti}       bold />
+                  <Row label="Totale Fonti"       value={spData.totaleFonti}        bold />
                   {spData.totaleFonti > 0 && (
                     <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                       Solidità: {((spData.patrimonioNetto / spData.totaleFonti) * 100).toFixed(1)}% | Leva: {spData.debitiBreve + spData.debitiLungo > 0 ? ((spData.debitiBreve + spData.debitiLungo) / Math.max(1, spData.patrimonioNetto)).toFixed(2) : '—'}
@@ -591,9 +679,9 @@ const Report = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
                     {[
-                      { label: 'Budget',       value: preventivo.budget,      color: 'var(--text-bright)' },
-                      { label: 'Consuntivo',   value: preventivo.consuntivo,  color: 'var(--text-bright)' },
-                      { label: 'Scostamento',  value: preventivo.consuntivo - preventivo.budget, color: (preventivo.consuntivo - preventivo.budget) >= 0 ? 'var(--success)' : 'var(--danger)' },
+                      { label: 'Budget',      value: preventivo.budget,     color: 'var(--text-bright)' },
+                      { label: 'Consuntivo',  value: preventivo.consuntivo, color: 'var(--text-bright)' },
+                      { label: 'Scostamento', value: preventivo.consuntivo - preventivo.budget, color: (preventivo.consuntivo - preventivo.budget) >= 0 ? 'var(--success)' : 'var(--danger)' },
                     ].map(({ label, value, color }) => (
                       <div key={label}>
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{label}</span>

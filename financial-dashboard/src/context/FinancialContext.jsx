@@ -38,15 +38,29 @@ const defaultSP = {
   fondoImposte: 0, fondoSvalutazione: 0,
 };
 
-const defaultPreventivo = { budget: 0, consuntivo: 0 };
+const defaultPreventivo = {
+  budget: 0,
+  consuntivo: 0,
+  categorie: [
+    { id: 1, nome: 'Ricavi Vendite',       budget: 0, consuntivo: 0 },
+    { id: 2, nome: 'Costi del Personale',  budget: 0, consuntivo: 0 },
+    { id: 3, nome: 'Acquisti e Forniture', budget: 0, consuntivo: 0 },
+    { id: 4, nome: 'Servizi Esterni',      budget: 0, consuntivo: 0 },
+    { id: 5, nome: 'Ammortamenti',         budget: 0, consuntivo: 0 },
+    { id: 6, nome: 'Oneri Finanziari',     budget: 0, consuntivo: 0 },
+  ],
+};
 
 const buildDefaultState = () => {
   const anni = {};
   ANNI.forEach(a => {
     anni[a] = {
-      contoEconomico: { ...defaultCE },
+      contoEconomico:    { ...defaultCE },
       statoPatrimoniale: { ...defaultSP },
-      preventivo: { ...defaultPreventivo },
+      preventivo:        {
+        ...defaultPreventivo,
+        categorie: defaultPreventivo.categorie.map(c => ({ ...c })),
+      },
     };
   });
   return { anni, annoSelezionato: ANNO_CORRENTE };
@@ -54,9 +68,12 @@ const buildDefaultState = () => {
 
 const financialReducer = (state, action) => {
   const anno = action.anno || state.annoSelezionato;
+
   switch (action.type) {
+
     case 'SET_ANNO':
       return { ...state, annoSelezionato: action.anno };
+
     case 'UPDATE_CE':
       return {
         ...state,
@@ -68,6 +85,7 @@ const financialReducer = (state, action) => {
           },
         },
       };
+
     case 'UPDATE_SP':
       return {
         ...state,
@@ -79,6 +97,7 @@ const financialReducer = (state, action) => {
           },
         },
       };
+
     case 'UPDATE_PREV':
       return {
         ...state,
@@ -90,6 +109,22 @@ const financialReducer = (state, action) => {
           },
         },
       };
+
+    case 'UPDATE_PREV_CATEGORIE':
+      return {
+        ...state,
+        anni: {
+          ...state.anni,
+          [anno]: {
+            ...state.anni[anno],
+            preventivo: {
+              ...state.anni[anno].preventivo,
+              categorie: action.categorie,
+            },
+          },
+        },
+      };
+
     case 'RESET_CE':
       return {
         ...state,
@@ -98,6 +133,7 @@ const financialReducer = (state, action) => {
           [anno]: { ...state.anni[anno], contoEconomico: { ...defaultCE } },
         },
       };
+
     case 'RESET_SP':
       return {
         ...state,
@@ -106,8 +142,10 @@ const financialReducer = (state, action) => {
           [anno]: { ...state.anni[anno], statoPatrimoniale: { ...defaultSP } },
         },
       };
+
     case 'RESET_ALL':
       return buildDefaultState();
+
     default:
       return state;
   }
@@ -116,14 +154,34 @@ const financialReducer = (state, action) => {
 const migrateFromV2 = (saved) => {
   try {
     const parsed = JSON.parse(saved);
-    if (parsed.anni) return parsed;
-    const stato = buildDefaultState();
-    stato.anni[ANNO_CORRENTE] = {
-      contoEconomico: { ...defaultCE, ...parsed.contoEconomico },
-      statoPatrimoniale: { ...defaultSP, ...parsed.statoPatrimoniale },
-      preventivo: { ...defaultPreventivo, ...parsed.preventivo },
-    };
-    return stato;
+    if (!parsed.anni) {
+      const stato = buildDefaultState();
+      stato.anni[ANNO_CORRENTE] = {
+        contoEconomico:    { ...defaultCE,        ...parsed.contoEconomico },
+        statoPatrimoniale: { ...defaultSP,         ...parsed.statoPatrimoniale },
+        preventivo:        { ...defaultPreventivo, ...parsed.preventivo },
+      };
+      return stato;
+    }
+    ANNI.forEach(a => {
+      if (!parsed.anni[a]) {
+        parsed.anni[a] = {
+          contoEconomico:    { ...defaultCE },
+          statoPatrimoniale: { ...defaultSP },
+          preventivo: {
+            ...defaultPreventivo,
+            categorie: defaultPreventivo.categorie.map(c => ({ ...c })),
+          },
+        };
+      } else if (!parsed.anni[a].preventivo?.categorie) {
+        parsed.anni[a].preventivo = {
+          ...defaultPreventivo,
+          ...parsed.anni[a].preventivo,
+          categorie: defaultPreventivo.categorie.map(c => ({ ...c })),
+        };
+      }
+    });
+    return parsed;
   } catch {
     return null;
   }
