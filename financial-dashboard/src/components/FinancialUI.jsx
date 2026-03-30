@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';
+import { ChevronDown, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 
 const fmt = (n) => {
   if (!n && n !== 0) return '—';
@@ -64,9 +64,9 @@ export const Field = ({ label, name, value, onChange, hint }) => {
 
   const currentNum = parseFloat(display) || 0;
   const inputColor = currentNum > 0
-    ? 'rgba(15,212,148,0.65)'
+    ? 'rgba(15,212,148,0.7)'
     : currentNum < 0
-    ? 'rgba(255,77,106,0.65)'
+    ? 'rgba(255,77,106,0.7)'
     : undefined;
 
   const emit = useCallback((num) => {
@@ -182,7 +182,16 @@ export const SubtotalRow = ({ label, value, isTotal = false, color }) => {
       className={`subtotal-row${isTotal ? ` total ${color}` : ''}`}
       style={isTotal && color ? { borderColor: `${c}40`, background: `${c}10` } : {}}
     >
-      <span style={{ color: isTotal ? c : 'var(--text)', fontFamily: 'var(--font)' }}>
+      <span style={{
+        color: isTotal ? c : 'var(--text)',
+        fontFamily: 'var(--font)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+      }}>
+        {isTotal && (
+          <ArrowRight size={12} style={{ opacity: 0.6, flexShrink: 0 }} />
+        )}
         {label}
       </span>
       <span style={{ color: c, fontFamily: 'var(--mono)', fontWeight: isTotal ? 700 : 500 }}>
@@ -225,7 +234,7 @@ export const KpiCard = ({ label, value, sub, color = 'blue', icon, prevValue }) 
           display: 'flex',
           alignItems: 'center',
           gap: 4,
-          marginTop: '0.4rem',
+          marginTop: '0.45rem',
           fontSize: '0.68rem',
           fontFamily: 'var(--mono)',
           fontWeight: 700,
